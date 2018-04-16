@@ -20,7 +20,7 @@ function draw() {
   translate(0,10,0);
   rotateX(-89);
   //rotateZ(frameCount * 0.01);
-  rotateZ((windowWidth/2-mouseX) * 0.1);
+  rotateZ(-(windowWidth/2-mouseX) * 0.01);
   model(head); 
 }
 
