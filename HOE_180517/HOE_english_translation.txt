@@ -1,0 +1,44 @@
+Generous, Modest
+Extravagant, Sustainable
+Open, Introverted
+Flexible, Conventional
+Classical, Modern
+Individualizing, Cautious
+Contextual, Catching
+
+var choice1_text = ["","sehr grosszügig","eher grosszügig","eher bescheiden","sehr bescheiden"];
+var choice2_text = ["","ausserordentlich aufwendiges","relativ aufwendiges","relativ nachhaltiges","ausserordentlich nachhaltiges"];
+var choice3_text = ["","maximal offene","mehrheitlich offene","mehrheitlich introvertierte","maximal introvertierte"];
+var choice4_text = ["","hochflexiblen","flexiblen","konventionellen","hochkonventionellen"];
+var choice5_text = ["","Klassische","Klassische","Moderne","Moderne"];
+var choice6_text = ["","Viele identitätsstiftende","Identitätsstiftende","Zurückhaltende","Wenige zurückhaltende"];
+
+var choice1_text = ["","very generously","rather generously","rather modestly","very modestly"];
+var choice2_text = ["","an extraordinarily extravagant","a relatively extravagant","a relatively sustainable","an extraordinarily sustainable"];
+var choice3_text = ["","maximally open","mostly open","mostly introverted","maximally introverted"];
+var choice4_text = ["","highly flexible","flexible","conventional","highly conventional"];
+var choice5_text = ["","Particularly classical","Somewhat classical","Somewhat modern","Particularly modern"];
+var choice6_text = ["","Distinctly individualizing","Individualizing","Cautious","Distinctly cautious"];
+var choice7_text = ["","succinct","concise","unique","catching"];
+
+
+  text_description   =  "Das 'HAUS " + trim(user_name) + "' ist " + choice1_text[code_choices[1]]
+                        + " angelegt und besticht durch sein " + choice2_text[code_choices[2]]
+                        + " Konzept. Die " + choice3_text[code_choices[3]]
+                        + " Fassadengestaltung entwickelt exemplarische Synergien mit der " + choice4_text[code_choices[4]]
+                        + " Struktur des Innenraums. " + choice6_text[code_choices[6]]
+                        + " Elemente unterstreichen die kontextuell prägnante Setzung des Volumens in seiner Umgebung. " + choice5_text[code_choices[5]]
+                        + " Akzente verleihen dem 'HAUS " + trim(user_name)
+                        + "' das gewisse Etwas und machen den Neubau so zu etwas ganz Besonderem.";
+
+  text_description   =  "The 'House " + trim(user_name) + "' is " + choice1_text[code_choices[1]]
+                        + " built and captivates by having " + choice2_text[code_choices[2]]
+                        + " concept. The " + choice3_text[code_choices[3]]
+                        + " facade design develops exemplary synergies with the " + choice4_text[code_choices[4]]
+                        + " structure of the interior. " + choice6_text[code_choices[6]]
+                        + " elements underline the contextually " + choice7_text[code_choices[7]]
+                        + " placement of the volume in its environment. " + choice5_text[code_choices[5]]
+                        + " accents give the 'House " + trim(user_name)
+                        + "' that certain 'something' and make the new building so distinctive.";
+
+
