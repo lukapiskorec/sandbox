@@ -703,7 +703,8 @@
 
 
     //override
-    var ditherPixelScale = 16.0;
+    var ditherPixelScale = 4.0 * pixRatio;
+    console.log("pixRatio ->", pixRatio);
 
     //Dither
     var effectDither = new THREE.ShaderPass( THREE.MonocellShader );
