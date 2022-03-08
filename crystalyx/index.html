@@ -1,0 +1,1149 @@
+<head>
+  <style> body { margin: 0; } </style>
+  <script src="js/unpkg/three.js"></script>
+  <script src="js/unpkg/d3.js"></script>
+  <script src="js/unpkg/3d-force-graph.js"></script>
+  <script src="js/postprocessing/EffectComposer.js"></script>
+  <script src="js/postprocessing/RenderPass.js"></script>
+  <script src="js/postprocessing/MaskPass.js"></script>
+  <script src="js/postprocessing/ShaderPass.js"></script>
+  <script src="js/shaders/CopyShader.js"></script>
+  <script src="js/shaders/FXAAShader.js"></script>
+  <script src="js/shaders/C64Shader.js"></script>
+  <script src="js/shaders/MonocellShader_02.js"></script>
+  <script src="js/shaders/ConvolutionShader.js"></script>
+  <script src="js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/subdivision_module/subdivision.js"></script>
+  <script src="js/palettes/ProtocellsTextures.js"></script>
+  <script src="js/capture/CCapture.all.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script id="fxhash-snippet">
+    //---- do not edit the following code (you can indent as you wish)
+    let alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+    var fxhash = "oo" + Array(49).fill(0).map(_=>alphabet[(Math.random()*alphabet.length)|0]).join('')
+    let b58dec = str=>[...str].reduce((p,c)=>p*alphabet.length+alphabet.indexOf(c)|0, 0)
+    let fxhashTrunc = fxhash.slice(2)
+    let regex = new RegExp(".{" + ((fxhashTrunc.length/4)|0) + "}", 'g')
+    let hashes = fxhashTrunc.match(regex).map(h => b58dec(h))
+    let sfc32 = (a, b, c, d) => {
+      return () => {
+        a |= 0; b |= 0; c |= 0; d |= 0
+        var t = (a + b | 0) + d | 0
+        d = d + 1 | 0
+        a = b ^ b >>> 9
+        b = c + (c << 3) | 0
+        c = c << 21 | c >>> 11
+        c = c + t | 0
+        return (t >>> 0) / 4294967296
+      }
+    }
+    var fxrand = sfc32(...hashes)
+    // true if preview mode active, false otherwise
+    // you can append preview=1 to the URL to simulate preview active
+    var isFxpreview = new URLSearchParams(window.location.search).get('preview') === "1"
+    // call this method to trigger the preview
+    function fxpreview() {
+      console.log("fxhash: TRIGGER PREVIEW")
+    }
+    //---- /do not edit the following code
+  </script>
+
+</head>
+
+<body>
+  <div id="crystalyx"></div>
+  <button id="gif" class="lowerleft">o_o</button>
+  <button id="recenter" class="lowerright">><</button>
+
+  <script >
+
+
+  //Date Today
+  //var now = new Date();
+
+  //Settings
+  const start_bounds = 500.0;
+  var dynamic_track = false;
+
+
+  //FXHASH random function for specific implimentation
+  gene = fxrand;
+
+  //rand functions for random generator. Assumes generator producing float point between 0 and 1
+  function generateRandomInt(min,max){
+    return Math.floor((gene() * (max-min)) +min);
+  }
+
+  function gene_range(min,max){
+    return (gene() * (max-min)) +min;
+  }
+
+  function gene_pick_n(min, max, n){
+    var unique_list = [];
+    for (var i = 0; i < n; i++) {
+      unique_list.push(Math.floor((gene() * (max-min)) + min));
+    }
+    return unique_list
+  }
+
+  function gene_weighted_choice(data){
+    let total = 0;
+    for (let i = 0; i < data.length; ++i) {
+        total += data[i][1];
+    }
+    const threshold = gene() * total;
+    total = 0;
+    for (let i = 0; i < data.length - 1; ++i) {
+        total += data[i][1];
+        if (total >= threshold) {
+            return data[i][0];
+        }
+    }
+    return data[data.length - 1][0];
+  }
+
+  //subdivision rule decleration
+  rule_pyramid = new RulePyramid_v2();
+  rule_tapered = new RuleTapered_v2();
+
+  //lattice gene assignment
+  const allel_primitive = [
+    ["tetrahedron", 1],
+    ["octahedron", 1],
+    ["hexahedron", 1],
+    ["dodecahedron", 1],
+  ];
+  var primitive = gene_weighted_choice(allel_primitive);
+
+  const allel_deform = [
+    [[1, 1, 1], 50],
+    [[1, 0.25, 0.25], 20],
+    [[0.25, 1, 0.25], 20],
+    [[1, 1, 0.25], 10],
+  ];
+  var deform_type = gene_weighted_choice(allel_deform);
+
+  const allel_order = [
+    ['symmetric', 4],
+    ['irregular', 1],
+  ];
+  var order_type = gene_weighted_choice(allel_order);
+
+  if (order_type == 'symmetric') {
+    var allel_stage = [
+      [1, 5],
+      [2, 5],
+      [3, 65],
+      [4, 25],
+    ];
+  } else if (order_type == 'irregular'){
+    var allel_stage = [
+      [5, 60],
+      [6, 40],
+    ];
+  }
+  var stage = gene_weighted_choice(allel_stage);
+
+  const allel_rules_0 = gene() < 0.5 ? 0 : 1;
+  const allel_rules_1 = gene() < 0.5 ? 0 : 1;
+  const allel_rules_2 = gene() < 0.5 ? 0 : 1;
+  const allel_rules_3 = gene() < 0.5 ? 0 : 1;
+  const allel_rules_4 = gene() < 0.5 ? 0 : 1;
+  const allel_rules_5 = gene() < 0.5 ? 0 : 1;
+  var sub_rules = [allel_rules_0, allel_rules_1, allel_rules_2, allel_rules_3, allel_rules_4, allel_rules_5];
+  const allel_extrude_0 = gene_range(-200, 200);
+  const allel_extrude_1 = gene_range(-200, 200);
+  const allel_extrude_2 = gene_range(-200, 200);
+  const allel_extrude_3 = gene_range(-200, 200);
+  const allel_extrude_4 = gene_range(-200, 200);
+  const allel_extrude_5 = gene_range(-200, 200);
+  var extrude_face = [allel_extrude_0, allel_extrude_1, allel_extrude_2, allel_extrude_3, allel_extrude_4, allel_extrude_5];
+  const allel_contract_0 = gene_range(0.0, 0.95);
+  const allel_contract_1 = gene_range(0.0, 0.95);
+  const allel_contract_2 = gene_range(0.0, 0.95);
+  const allel_contract_3 = gene_range(0.0, 0.95);
+  const allel_contract_4 = gene_range(0.0, 0.95);
+  const allel_contract_5 = gene_range(0.0, 0.95);
+  var contract_middle = [allel_contract_0, allel_contract_1, allel_contract_2, allel_contract_3, allel_contract_4, allel_contract_5];
+  const allel_middle_0 = gene() < 0.5 ? false : true;
+  const allel_middle_1 = gene() < 0.5 ? false : true;
+  const allel_middle_2 = gene() < 0.5 ? false : true;
+  const allel_middle_3 = gene() < 0.5 ? false : true;
+  const allel_middle_4 = gene() < 0.5 ? false : true;
+  const allel_middle_5 = gene() < 0.5 ? false : true;
+  var leave_middle = [allel_middle_0, allel_middle_1, allel_middle_2, allel_middle_3, allel_middle_4, allel_middle_5]
+  const allel_reconfiguration = [
+    ['minimal', 1],
+    ['near', 2],
+    ['compact', 2],
+    ['far', 2],
+    ['spread', 1],
+    ];
+  var reconfiguration = gene_weighted_choice(allel_reconfiguration);
+  const allel_degeneration = [
+    ['none', 10],
+    ['near', 1],
+    ['middle', 1],
+    ['far', 1],
+    ['broken', 1],
+    ['absolute', 1]
+    ];
+  const allel_mod = [
+    [2, 1],
+    [3, 1],
+    [4, 1],
+  ];
+
+
+  var degeneration_type;
+  degeneration_type = 'none'; //overwritte for crystalyx collection
+
+  //disable degeneration for crystalyx collection
+  /*
+  if (stage == 1 || stage == 0) {
+    degeneration_type = "none";
+    order_type = "symmetric";
+  } else if (stage == 3 || stage == 2) {
+    if (stage == 2) {
+      order_type = "symmetric";
+    }
+    degeneration_type = gene_weighted_choice(allel_degeneration);
+  } else if (stage == 4 || stage == 5) {
+    degeneration_type = gene_weighted_choice(allel_degeneration);
+    primitive = "hexahedron" //overide
+  }
+  */
+
+
+  //const allel_18 = gene() < 0.5 ? 0 : 1;
+  //var background = ['#ffffff', '#000000'][allel_18];
+  const allel_modulation = [
+    ['none', 1],
+    ['alternate', 3],
+    ['half', 3],
+    ['random',3],
+    ['all',3]
+    ];
+  const allel_node = [
+    ['random', 4],
+    ['relative', 3],
+    ['similar', 1],
+    ['dynamic', 2]
+    ]
+  const allel_texture = [
+    ['lapis lazuli', 90],
+    ['ruby', 5],
+    ['emerald', 5],
+    ]
+  const allel_color_mode = [
+    ['3-bit', 90],
+    ['monochrome', 10],
+    ]
+
+  const modulation = gene_weighted_choice(allel_modulation);
+  var node_size = 'similar' //gene_weighted_choice(allel_node);
+  var texture = gene_weighted_choice(allel_texture);
+  var color_mode = gene_weighted_choice(allel_color_mode);
+
+
+  //select the tecture for matcap material and the background
+  const Textures = ProtocellsTextures;
+  var texture_idx = generateRandomInt(0, Textures[texture]['texture'].length);
+  var texture_path = 'js/textures/' + Textures[texture]['texture'][texture_idx];
+
+  var background_idx = generateRandomInt(0, Textures[texture]['background'].length);
+  var background = Textures[texture]['background'][background_idx][0];
+  var bloom_factor = Textures[texture]['background'][background_idx][1];
+
+
+
+
+  //if (texture == 'light') {
+  //  document.getElementById('recenter').style["color"] = "black";
+  //  document.getElementById('gif').style["color"] = "black";
+  //}
+
+
+  //overide on New Year's Day
+  //var day = now.getDate()
+  //var month = now.getMonth()
+  //if (day == 1 && month == 0) {
+  //  degeneration_type = 'absolute';
+  //  node_size = 'dynamic';
+  //}
+
+
+
+  //GENERATION OVERRIDES (turn off all in production version)
+
+  //reconfiguration = 'minimal';
+  //order_type = 'irregular';
+  //primitive = 'octahedron';
+  //stage = 3;
+  //degeneration_type = 'none';
+
+  /*
+  primitive = "hexahedron";
+  stage = 3;
+  order_type = 'symmetric';
+  reconfiguration = 'middle';
+  degeneration_type = 'far';
+  sub_rules = [1, 0, 1];
+  mod_rules = [1, 1, 1];
+  extrude_face = [-3.5440192193797215, -3.23514235482095, 0.3231519469052957];
+  contract_middle = [0.4260727525428488, 0.293390980234336, 0.8579965248558341];
+  leave_middle = [true, true, false];
+  modulation = "none";
+  */
+
+
+  //print variant
+  const node_mode = ['random', 'relative', 'similar', 'dynamic'].indexOf(node_size)
+
+  const variant_genome = {
+    'primitive' : primitive,
+    'stage' : stage,
+    'order_type' : order_type,
+    'reconfiguration' : reconfiguration,
+    'modulation' : modulation,
+    'degeneration_type' : degeneration_type,
+    'sub_rules' : sub_rules,
+    'extrude_face' : extrude_face,
+    'contract_middle' : contract_middle,
+    'leave_middle' : leave_middle,
+    'node_size' : node_size,
+  }
+
+  const variant_parts = [];
+  Object.keys(variant_genome).forEach(key => {
+    if (!(variant_genome[key] instanceof Array)) {
+      variant_parts.push(variant_genome[key])
+    }
+  });
+
+  const variant_name = "crystalyx_" + variant_parts.join('_');
+
+  console.log(variant_name);
+  Object.keys(variant_genome).forEach(key => {
+    console.log(key, '->', variant_genome[key]);
+  });
+
+
+  // LATTICE GENERATION STEPS
+
+  // Starting Primitive
+
+  var start_mesh;
+
+  if (primitive == "hexahedron") {
+    start_mesh = new Hexahedron(0,0,0, start_bounds*deform_type[0], start_bounds*deform_type[1], start_bounds*deform_type[2])
+  } else if (primitive == "dodecahedron") {
+    start_mesh = new Dodecahedron(0,0,0, start_bounds)
+  } else if (primitive == "tetrahedron") {
+    start_mesh = new Tetrahedron(0,0,0, start_bounds)
+  } else if (primitive == "octahedron") {
+    start_mesh = new Octahedron(0,0,0, start_bounds, start_bounds, start_bounds)
+  }
+
+  var lattice_mesh = start_mesh.get_mesh();
+
+
+  // Apply Rules
+
+  var mod_rules;
+  if (order_type == "symmetric") {
+    mod_rules = [1, 1, 1, 1, 1, 1];
+  } else if (order_type == "irregular") {
+    mod_rules = [gene_weighted_choice(allel_mod), gene_weighted_choice(allel_mod), gene_weighted_choice(allel_mod), gene_weighted_choice(allel_mod), gene_weighted_choice(allel_mod), gene_weighted_choice(allel_mod)];
+  }
+  console.log('mod_rules ->', mod_rules);
+
+  for (var i = 0; i < 6; i++) {
+    if (stage >= i+1) {
+      //console.log("]]]]]Stage:", i)
+      if (sub_rules[i] == 0) {
+        lattice_mesh = rule_pyramid.replace(lattice_mesh, extrude_face[i], mod_rules[i]);
+      } else {
+        lattice_mesh = rule_tapered.replace(lattice_mesh, contract_middle[i], extrude_face[i], leave_middle[i], mod_rules[i])
+      }
+    }
+  }
+
+  // Get Data from Mesh & Compute layers
+  var gData = mesh_to_gData(lattice_mesh)
+
+
+
+  //Generate level sequence
+
+  const allel_layers_1 = [
+    //[1, 2],
+    //[2, 2],
+    [3, 2],
+    [4, 1],  //Added larger
+    [5, 1],  //Added larger
+  ];
+
+  const allel_layers_2 = [
+    [1, 1],
+    [2, 1],
+  ];
+
+
+  const link_count = Object.keys(gData['links']).length;
+  var layer_length = Object.keys(gData['layers']).length;
+
+  var layers= [0];
+  if (reconfiguration == "near") {
+    var nr_layers = gene_weighted_choice(allel_layers_1)
+    if (layer_length > nr_layers) {
+      for (var i = 1; i < nr_layers; i++) {
+        layers.push(i)
+      }
+    } else {
+      layers.push(1)
+    }
+  } else if (reconfiguration == "compact") {
+    for (var i = 1; i < gene_weighted_choice(allel_layers_1); i++) {
+    layers.push(i)
+    }
+  } else if (reconfiguration == "far") {
+
+    var nr_layers = gene_weighted_choice(allel_layers_1)
+    if (layer_length > nr_layers) {
+      for (var i = 1; i < nr_layers; i++) {
+        layers.push(layer_length-i-1)
+      }
+    } else {
+        layers.push(layer_length-1)
+    }
+  } else if (reconfiguration == "spread") {
+    if (layer_length > 5) {
+      for (var i = 1; i < 5; i++) {
+        layers.push(parseInt(gene_range(1, layer_length-1)))
+      }
+    } else if (layer_length > 2) {
+      for (var i = 1; i < layer_length; i++) {
+        layers.push(parseInt(gene_range(1, layer_length-1)))
+      }
+    }
+  }
+
+  gData['unique_edge_lengths'].splice(0, 0, 100); //add 100 as it seems preasent everywhere
+  var nr_unique_edge_lengths = gData['unique_edge_lengths'].length;
+  var randallel = [
+  [0,1],
+  [1,1],
+  [2,2],
+  ]
+
+  const modulation_pattern = [];
+  if (modulation == "none") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+        modulation_pattern.push(2); //some number larger than one to disable
+      }
+  } else if (modulation == "alternate") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+      if (i%2 == 0) {
+        modulation_pattern.push(0);
+      } else {
+        modulation_pattern.push(1);
+      }
+
+    }
+  } else if (modulation == "half") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+      if (i <= nr_unique_edge_lengths/2) {
+        modulation_pattern.push(0);
+      } else {
+        modulation_pattern.push(1);
+      }
+    }
+  } else if (modulation == "all") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+        modulation_pattern.push(0);
+      }
+  } else if (modulation == "random") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+        modulation_pattern.push(gene_weighted_choice(randallel));
+      }
+  }
+
+
+   //const percentage = 1.0 //this corresponds to 100%, or all links in a level
+   //const destruction_percentage = 0.1 //precentage of nodes removed randomly if degeneration_type = "broken"
+   var deactivate_layers = []; //
+   if (degeneration_type == "near") {
+     var nr_layers = gene_weighted_choice(allel_layers_2)
+     if (layer_length > nr_layers) {
+         deactivate_layers.push(nr_layers) //gData['layers'].length-i-1
+     } else {
+       deactivate_layers.push(0)
+     }
+   } else if (degeneration_type == "middle") {
+     deactivate_layers.push(parseInt(layer_length/2))
+   } else if (degeneration_type == "far") {
+     var nr_layers = gene_weighted_choice(allel_layers_2)
+     if (layer_length > nr_layers) {
+       for (var i = 0; i < nr_layers; i++) {
+         deactivate_layers.push(layer_length-i-1)
+       }
+     }
+   } else if (degeneration_type == "absolute") {
+      //Randomly decompose to nothing
+   } else if (degeneration_type == "broken") {
+       //console.log(layer_length)
+       deactivate_layers.push(layer_length-1)
+   }
+
+
+
+   var added_links = 0;
+   for (var i = 0; i < layers.length; i++) {
+     var layer_key = Object.keys(gData['layers'])[layers[i]]
+     for (var j = 0; j < gData['layers'][layer_key].length; j++) {
+       var link = gData['layers'][layer_key][j]['link'];
+       gData['links'].push({source: link[0], target: link[1], value:100, 'visible':false, 'state':i+1}) //For actual length gData['layers'][layer_key][i]['layer']
+       added_links ++;
+     }
+   }
+
+   //console.log("selected layers ->", layers, ' Added Anim links ->', added_links)
+   //console.log("deactivate layers ->", deactivate_layers)
+   var dnodes = [];
+   for (var i = 0; i < deactivate_layers.length; i++) {
+     var layer_key = Object.keys(gData['layers'])[deactivate_layers[i]]
+     for (var j = 0; j < gData['layers'][layer_key].length; j++) {
+       var link = gData['layers'][layer_key][j]['link']
+       for (var i = 0; i < gData.links.length; i++) {
+         var e = gData.links[i];
+         if (e.source == link[0] || e.target == link[1] || e.source == link[1] || e.target == link[0] ){
+           dnodes.push(e);
+         }
+       }
+     }
+   }
+
+   if (degeneration_type == 'absolute') {
+     dnodes.push(...gData.links)
+   }
+
+   dnodes = [...new Set(dnodes)]
+
+
+
+
+   var total_nodes = gData.nodes.length;
+   console.log("number of nodes ->", total_nodes);
+   console.log("magnitude ->", Math.floor(Math.log10(gData.nodes.length)) + 1);
+   console.log("texture ->", texture);
+   console.log("color mode ->", color_mode);
+   console.log("background ->", background);
+
+
+
+   //FXHASH
+   window.$fxhashFeatures = {
+   "Primitive": primitive,
+   "Stage": stage,
+   "Order": order_type,
+   "Composition": texture,
+   "Color mode": color_mode,
+   "Reconfiguration": reconfiguration,
+   "Modulation": modulation
+   };
+
+
+    //define new material for the mesh
+    //const custom_material = new THREE.MeshNormalMaterial();
+    //custom_material.transparent = true;
+    //custom_material.opacity = 0.5;
+    //custom_material.color = new THREE.Color( 0xffffff );
+    //custom_material.type = 'LineBasicMaterial';
+    //custom_material.linewidth = 1;
+    //custom_material.linecap = 'round';
+    //custom_material.linejoin = 'round';
+
+
+
+    const in_case_of_common_size = gene();
+
+    function invert_whites(colour) {
+      if (colour == '#ffffff') {
+        return '#000000'
+      } else {return colour}
+    }
+
+
+
+    function calculate_size(mode, node) {
+      if (mode == 0) {
+        return gene() * 50 + 25
+      } else if (mode == 1) {
+        return (node.connectivity/5) * 50 + 25
+      } else if (mode == 2) {
+        return in_case_of_common_size * 50 + 25
+      } else if (mode == 3) {
+        return gene() * 50 + 25
+      }
+    }
+
+    //generateRandomInt(min,max)
+
+    const elem = document.getElementById('crystalyx');
+    const d3VelocityDecay = 0.05; //0.10
+
+
+
+
+
+    function get_frame(capturer, renderer) {
+        if (capturer) {
+          //ensure scene is rendered
+          //renderer.render( Graph.scene(), Graph.camera());
+
+          //ensure scene is rendered with the layered effects
+          const composer = Graph.postProcessingComposer()
+          composer.render();
+          renderer.setAnimationLoop(capturer.capture(renderer.domElement))
+
+        }
+    }
+
+    var Graph;
+    var renderer;
+    var capturer
+
+    function crystalyx () {
+
+    Graph = ForceGraph3D()(elem)
+    .graphData(gData)
+    .d3VelocityDecay(d3VelocityDecay) // original 0.01
+    .enableNavigationControls(true)
+    .showNavInfo(false)
+    .backgroundColor(background)
+    //.nodeRelSize(80) //originally set to nodeSize
+    .nodeResolution(6)
+    .nodeThreeObject(({ id }) => new THREE.Mesh(
+            new THREE.SphereGeometry(50, 2, 2),
+            new THREE.MeshLambertMaterial({
+            //color: Math.round(Math.random() * Math.pow(2, 24)),
+            transparent: true,
+            opacity: 0,
+            depthTest: false,
+          })
+        ))
+    //.nodeColor(0xffffff)
+    //.nodeVisibility(false)
+    //.nodeOpacity(0)
+    .linkOpacity(0)
+	  .linkResolution(1)
+    .onNodeClick(node => {
+        // Aim at node from outside it
+        const distance = 40;
+        const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+        Graph.cameraPosition(
+          { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, // new position
+          node, // lookAt ({ x, y, z })
+          3000  // ms transition duration
+        );
+      })
+
+    let geometry = new THREE.BufferGeometry()
+
+    let points = []
+    //console.log(gData['nodes'])
+    for (var i = 0; i < gData['mesh'].length; i++) {
+      var face = gData['mesh'][i];
+      //console.log(face)
+      if (face.length ==3) {
+        for (var j = 0; j < face.length; j++) {
+          points.push(face[j]) //gData['nodes'][face[j]]
+        }
+      } else if (face.length == 4) {
+          points.push(face[0])
+          points.push(face[1])
+          points.push(face[2])
+
+          points.push(face[0])
+          points.push(face[2])
+          points.push(face[3])
+
+          // points.push(face[1])
+          // points.push(face[2])
+          // points.push(face[3])
+          //
+          // points.push(face[1])
+          // points.push(face[3])
+          // points.push(face[0])
+        }
+
+    }
+    // for (var i = 0; i < gData['nodes'] .length; i++) {
+    //
+    //   //TODO create a structure for each face based on the faces from subdivision
+    //
+    //   //var point = //.__threeObj.position //new THREE.Vector3(gData['nodes'][i].x, gData['nodes'][i].y, gData['nodes'][i].z)
+    //
+    //   points.push(gData['nodes'][i])
+    // }
+     //.setFromPoints(gData['nodes']);
+
+    //material definition
+    var material = new THREE.MeshMatcapMaterial(); // 'MeshMatcapMaterial', 'MeshBasicMaterial', 'MeshLambertMaterial', 'MeshNormalMaterial', 'LineBasicMaterial'
+    material.side = THREE.DoubleSide; //Material needs to be double sided
+    material.transparent = true;
+    material.opacity = 0.5; //0.5
+
+    const matcapTexture = new THREE.TextureLoader().load(texture_path); //matcap-crystal, matcap-gold, matcap-green-yellow-pink, matcap-opal, matcap-red-light, matcap-green-light
+    material.matcap = matcapTexture;
+    material.flatShading = true;
+
+    geometry.setFromPoints(points)
+    geometry.computeVertexNormals()
+
+
+    //Create the mesh and add a reference to it
+    mesh = new THREE.Mesh(geometry, material);
+
+    //mesh.geometry.dynamic = true;
+
+    //Add object to scene
+    Graph.scene().add(mesh);
+
+
+
+    //const cell_canvas = document.querySelector('canvas')
+    renderer = Graph.renderer()
+    //renderer.domElement.getContext('webgl' , {preserveDrawingBuffer: true});
+
+
+    //Update Mesh position with engine tick
+    Graph.onEngineTick(() => {
+      let meshPos = mesh.geometry.getAttribute('position');
+      geometry.setFromPoints(points) //Update Positions
+      meshPos.needsUpdate = true;
+      })
+
+    //console.log(nodeForce.strength(link => link))
+
+    const linkForce = Graph
+      .d3Force('link')
+      //.distance(link => (link.source.connectivity+link.target.connectivity)/2 + link.value);
+
+
+    var winWidth = window.innerWidth;
+    var winHeight =  window.innerHeight;
+    var pixRatio = window.devicePixelRatio;
+    var resolution = new THREE.Vector2( winWidth*pixRatio, winHeight*pixRatio );
+
+
+
+    //Bloom
+    const bloomPass = new THREE.UnrealBloomPass();
+    bloomPass.strength = 3.0;
+    bloomPass.radius = 1.0;
+    bloomPass.threshold = 0.1;
+    Graph.postProcessingComposer().addPass(bloomPass);
+
+
+    const min_bloomPass = new THREE.UnrealBloomPass();
+    min_bloomPass.strength = 0.22 + 0.70 * bloom_factor; //bloom_factor comes from ProtocellsTextures.js
+    min_bloomPass.radius = 0.1;
+    min_bloomPass.threshold = 0.2; //0.1
+    Graph.postProcessingComposer().addPass(min_bloomPass);
+
+
+    //tried to fix device pixel ratio for fxhas preview window
+    //https://stackoverflow.com/questions/16541676/what-are-best-practices-for-detecting-pixel-ratio-density
+    function getDevicePixelRatio() {
+        var mediaQuery;
+        var is_firefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+        if (window.devicePixelRatio !== undefined && !is_firefox) {
+            return window.devicePixelRatio;
+        } else if (window.matchMedia) {
+            mediaQuery = "(-webkit-min-device-pixel-ratio: 1.5),\
+              (min--moz-device-pixel-ratio: 1.5),\
+              (-o-min-device-pixel-ratio: 3/2),\
+              (min-resolution: 1.5dppx)";
+            if (window.matchMedia(mediaQuery).matches) {
+                return 1.5;
+            }
+            mediaQuery = "(-webkit-min-device-pixel-ratio: 2),\
+              (min--moz-device-pixel-ratio: 2),\
+              (-o-min-device-pixel-ratio: 2/1),\
+              (min-resolution: 2dppx)";
+            if (window.matchMedia(mediaQuery).matches) {
+                return 2;
+            }
+            mediaQuery = "(-webkit-min-device-pixel-ratio: 0.75),\
+              (min--moz-device-pixel-ratio: 0.75),\
+              (-o-min-device-pixel-ratio: 3/4),\
+              (min-resolution: 0.75dppx)";
+            if (window.matchMedia(mediaQuery).matches) {
+                return 0.7;
+            }
+        } else {
+            return 1;
+        }
+    };
+
+
+    //calling above function - not sure if it works in production
+    pixRatio = getDevicePixelRatio();
+
+    //setting the dither pixel size adaptable to different devices
+    var ditherPixelScale = 2.0 * pixRatio;
+    console.log("pixRatio ->", pixRatio);
+
+    //Dither
+    var effectDither = new THREE.ShaderPass( THREE.MonocellShader );
+    var grayscale_on = color_mode == 'monochrome' ? 1 : 0;
+    effectDither.uniforms[ 'grayScale' ].value = grayscale_on;
+    effectDither.uniforms[ 'pixelScale' ].value = ditherPixelScale;
+    Graph.postProcessingComposer().addPass(effectDither);
+
+
+
+    function isInactiveLink(link) {
+      //console.log(link.state)
+      if (parseInt(link.state)  < 0) {
+        return true;
+      } else {
+        return false
+      }
+    }
+
+    linkForce.strength(link => {
+      if (parseInt(link.state) > 0) {
+      return 0 //Animation
+    } else if (parseInt(link.state) < 0) {
+      return 0.0001 //Broken Links
+    } else { return 0.1} //MonoGrid
+    })
+    linkForce.distance(link => link.value)
+    //linkForce.strength(link => console.log())
+
+
+    //Degeneration
+    var link_index = 0;
+    var assemble = false;
+    var delay = false;
+    var initial_delay = false;
+
+    //delay degeneration
+
+    setTimeout(() => {
+      if (!(degeneration_type == "none")) {
+        initial_delay = true;
+        console.log("degeneration started..")
+      }
+    }, 5000);
+
+    //console.log("nodes to cycle through:", dnodes.length)
+
+    setInterval(() => {
+    if (!(degeneration_type == "none") && initial_delay == true) {
+      if (assemble == false && link_index < dnodes.length) {
+      var e = dnodes[link_index]
+        gData.links.splice(gData.links.indexOf(e), 1)
+        link_index++;
+        //console.log("disassembling")
+        //Graph.linkThreeObject(link => {})
+        //  .linkPositionUpdate((line, { start, end }) => {
+        //const linePos = line.geometry.getAttribute('position');
+        //linePos.needsUpdate = true;
+        //});
+    } else if (link_index == dnodes.length || link_index == -1) {
+        if (delay == false) {
+          delay = setTimeout(() => {
+            assemble = !assemble;
+            if (assemble) {
+              link_index--;
+            } else {
+              link_index++;
+            }
+            delay = false
+          }, 5000)
+        }
+
+
+      } else if (assemble == true) {
+        //console.log("assembling")
+        gData.links.push(dnodes[link_index])
+        link_index--;
+        //Graph.linkThreeObject(link => {})
+        //  .linkPositionUpdate((line, { start, end }) => {
+        //const linePos = line.geometry.getAttribute('position');
+        //linePos.needsUpdate = true;
+        //});
+      }
+
+    }
+
+}, 50);
+
+
+
+
+    //function connected_filter(nodes) {node}
+    //console.log(gData.nodes)
+
+
+    const amplitude = 0.5;
+    const frame_rate = 100;
+    const scale_time_step = Math.PI / frame_rate;
+
+    function update_scale(node, index){
+      var ascale = (1 == (-1)**node.connectivity) ? nscale : 1-nscale
+      node.__threeObj.scale.set(ascale,ascale,ascale);
+    };
+
+
+    //let npulse = 0;
+    let snap = true;
+    /*
+    if (node_mode == 3) {
+      setInterval(() => {
+        nscale = 0.5 + Math.sin(npulse)/2;
+        gData.nodes.forEach(update_scale);
+        npulse += scale_time_step;
+      }, 50);
+    };
+    */
+
+    let xpulse = 0;
+
+    var min_cml_edge_lgt = 0;
+    var max_cml_edge_lgt = 0;
+
+    setInterval(() => {
+    //var selected_len = gData['unique_edge_lengths'][0]
+    //var selected_links = Object.keys(gData['links']).
+    //filter((key) => key.l_len == selected_len).
+    //reduce((cur, key) => { return Object.assign(cur, { [key]: obj[key] })}, {});
+
+    //This zooms to fit till the first expansion then stops being activated.
+    if (xpulse > Math.PI/2 && snap) {
+      //console.log("ZoomExtents")
+      snap = false;
+      Graph.zoomToFit(2000);
+      setTimeout(() => { fxpreview(); }, 1000);
+    }
+
+    //Replace 0 with %[0,1,1,1,1][gData['unique_edge_lengths'].indexOf(link.value)] with [0,1,1,1,1] being the length of the unique lengths with some pattern
+    var link_cml_edge_dist = 0;
+
+
+    linkForce.distance(link => {
+      var unique_edge_index = gData['unique_edge_lengths'].indexOf(link.value); //sumtimes is -1
+      //if (gData['unique_edge_lengths'].indexOf(link.value) == -1) {
+      //  console.log(link.value,gData['unique_edge_lengths'])
+      //}
+      var animation_map = [Math.cos(xpulse), Math.sin(xpulse), 0]
+      //console.log(unique_edge_index, modulation_pattern, animation_map)
+      var this_edge_dist = (parseInt(link.state) >= 0 ? 1:0) *link.value* amplitude * animation_map[modulation_pattern[unique_edge_index]] + link.value; //* amplitude * animation_map[modulation_pattern[unique_edge_index]]
+      link_cml_edge_dist += this_edge_dist;
+      return this_edge_dist; //* (link.source.connectivity+link.target.connectivity)/2
+    })
+
+    //Autorange Bloom
+    if (xpulse < 4*Math.PI) {
+      if (min_cml_edge_lgt==0) {
+        min_cml_edge_lgt=link_cml_edge_dist;
+      }
+      else if (link_cml_edge_dist<min_cml_edge_lgt) {
+        min_cml_edge_lgt=link_cml_edge_dist;
+      }
+      if (link_cml_edge_dist > max_cml_edge_lgt) {
+        max_cml_edge_lgt = link_cml_edge_dist;
+      }
+    }
+
+    xpulse += scale_time_step
+    bloomPass.strength = bloom_factor * (1 - (link_cml_edge_dist-min_cml_edge_lgt)/(max_cml_edge_lgt-min_cml_edge_lgt));  //(link_count*50)
+
+    //Get the frame for Gif
+    get_frame(capturer, renderer);
+
+    Graph.d3ReheatSimulation();
+
+  }, frame_rate);
+
+  //Graph.onEngineStop(() => Graph.d3ReheatSimulation());
+
+
+    //Connection - Animate link layers
+
+    let seq = 0;
+    setInterval(() => {
+      if (dynamic_track) {
+        Graph.zoomToFit(1000, 0);
+      }
+      //console.log("SEQ: ", seq % layers.length)
+
+      linkForce.strength(link => {
+        if (parseInt(link.state) == 0) {
+          return 0.1
+        } else if (seq % layers.length == parseInt(link.state)) {
+          return 0.1
+        } else {
+          return 0.0001
+        }
+      })
+      seq ++
+
+    }, 3000);
+
+
+    // Set the camera position at the beginning
+    setTimeout(() => {
+      Graph.cameraPosition({ z: 5000 }); //z parameter determines the camera distance
+    }, 0)
+
+
+  }
+
+
+
+
+
+    window.addEventListener('resize', () => {
+         Graph.height(window.innerHeight);
+         Graph.width(window.innerWidth);
+         //Luka added these below
+         var winWidth = window.innerWidth;
+         var winHeight =  window.innerHeight;
+         var pixRatio = window.devicePixelRatio;
+
+         //renderer.setPixelRatio(window.devicePixelRatio);
+         //renderer.setSize( window.innerWidth, window.innerHeight );
+         //effectPixelate.uniforms.uResolution.value.set(winWidth*pixRatio, winHeight*pixRatio);
+    });
+
+
+    const handler = (e) => {
+        crystalyx();
+    };
+
+    const recorder = (e) => {
+      //renderer.setPixelRatio(window.devicePixelRatio);
+      //renderer.setSize( window.innerWidth, window.innerHeight );
+      const canvas = document.querySelector("canvas");
+      const recenterBtn = document.getElementById('recenter');
+      const recordBtn = document.getElementById('gif');
+      let recording = false;
+      //let mediaRecorder;
+      //let recordedChunks;
+
+      recenterBtn.addEventListener("click", () => {
+        Graph.zoomToFit(400);
+      });
+
+      recenterBtn.addEventListener("dblclick", () => {
+        dynamic_track = !dynamic_track
+        if (dynamic_track) {
+          recenterBtn.textContent = ">><<"
+        } else {
+          recenterBtn.textContent = "><"
+        }
+      });
+
+      recordBtn.addEventListener("click", () => {
+        recording = !recording;
+          if(recording){
+                  //new capturer instance
+                  capturer = new CCapture( {
+                    verbose: false,
+                    display: false,
+                    quality: 99,
+                    //name: variant_name,
+                    //framerate:,
+                    //autoSaveTime:,
+                    //timeLimit: 10000,
+                    format: 'gif',
+                    workersPath: 'js/capture/src/'
+                  } );
+                  capturer.start();
+                  recordBtn.textContent = "x";
+
+                  //recordedChunks = [];
+                  // mediaRecorder.ondataavailable = e => {
+                  //     if(e.data.size > 0){
+                  //         recordedChunks.push(e.data);
+                  //     }
+                  // };
+                  //mediaRecorder.start();
+              } else {
+                  //
+                  capturer.stop();
+                  setTimeout(() => {
+                    capturer.save(function( blob ) {
+                     const url = URL.createObjectURL(blob);
+                     const a = document.createElement("a");
+                     a.href = url;
+                     a.download = variant_name + ".gif";
+                     a.click();
+                     URL.revokeObjectURL(url);
+
+                     });
+                  setTimeout(() => {
+                    capturer = null;
+                    recordBtn.textContent = "o_o"
+                  }, 250);
+
+                    //Add clear method so we can save again
+
+
+                  },0);
+
+                  // setTimeout(() => {
+                  //     const blob = new Blob(recordedChunks, {
+                  //         type: "video/webm"
+                  //     });
+                  //     const url = URL.createObjectURL(blob);
+                  //     const a = document.createElement("a");
+                  //     a.href = url;
+                  //     a.download = variant_name + ".gif";
+                  //     a.click();
+                  //     URL.revokeObjectURL(url);
+                  // },0);
+              }
+      });
+    };
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+      handler();
+      recorder();
+    });
+
+
+    //Inactivty hide buttons
+    var interval = 1;
+
+    setInterval(function(){
+       if(interval == 5){
+           /* if intervall reaches 5 the user is inactive hide element/s */
+
+           document.getElementById('recenter').style.visibility = "hidden";
+           document.getElementById('gif').style.visibility = "hidden";
+           interval = 1;
+       }
+       interval = interval+1;
+    },1000);
+
+      document.onmousemove = function() {
+        /* on mousemove or keypressed show the hidden input (user active) */
+        document.getElementById('recenter').style.visibility = "visible";
+        document.getElementById('gif').style.visibility = "visible";
+        interval = 1;
+    };
+
+
+
+
+  </script>
+</body>
