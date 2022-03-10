@@ -736,7 +736,10 @@
 
     var winWidth = window.innerWidth;
     var winHeight =  window.innerHeight;
-    var pixRatio = window.devicePixelRatio;
+
+    //var pixRatio = window.devicePixelRatio;
+    //if device pixRatio is 1.0, we leave it so, if it's more, we double it (it will become 4.0 for an iPhone)
+    var pixRatio = (window.devicePixelRatio > 1.0) ? window.devicePixelRatio * 2.0 : 1.0;
     var resolution = new THREE.Vector2( winWidth*pixRatio, winHeight*pixRatio );
 
 
@@ -758,6 +761,7 @@
 
     //tried to fix device pixel ratio for fxhas preview window
     //https://stackoverflow.com/questions/16541676/what-are-best-practices-for-detecting-pixel-ratio-density
+    /*
     function getDevicePixelRatio() {
         var mediaQuery;
         var is_firefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
@@ -776,7 +780,7 @@
               (-o-min-device-pixel-ratio: 2/1),\
               (min-resolution: 2dppx)";
             if (window.matchMedia(mediaQuery).matches) {
-                return 4;
+                return 2;
             }
             mediaQuery = "(-webkit-min-device-pixel-ratio: 0.75),\
               (min--moz-device-pixel-ratio: 0.75),\
@@ -790,17 +794,17 @@
         }
     };
 
-
     //calling above function - not sure if it works in production
-    pixRatio = getDevicePixelRatio();
+    //pixRatio = getDevicePixelRatio();
+    */
 
     //setting the dither pixel size adaptable to different devices
-    var ditherPixelScale = 2.0 * pixRatio;
+    var ditherPixelScale = 2.0 * pixRatio; //chromoplasm had factor of 4.0 * pixRatio
     console.log("pixRatio ->", pixRatio);
 
     //Dither
     var effectDither = new THREE.ShaderPass( THREE.MonocellShader );
-    var grayscale_on = color_mode == 'monochrome' ? 1 : 0;
+    var grayscale_on = (color_mode == 'monochrome') ? 1 : 0;
     effectDither.uniforms[ 'grayScale' ].value = grayscale_on;
     effectDither.uniforms[ 'pixelScale' ].value = ditherPixelScale;
     Graph.postProcessingComposer().addPass(effectDither);
