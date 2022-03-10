@@ -738,8 +738,8 @@
     var winHeight =  window.innerHeight;
 
     //var pixRatio = window.devicePixelRatio;
-    //if device pixRatio is 1.0, we leave it so, if it's more, we double it (it will become 4.0 for an iPhone)
-    var pixRatio = (window.devicePixelRatio > 1.0) ? window.devicePixelRatio * 2.0 : 1.0;
+    //if device pixRatio is less than 1.0 or bigger than 3.0, we leave it so, otherwise we set it to 4.0 (for iPhone SE it will go from 2.0 to 4.0)
+    var pixRatio = ((window.devicePixelRatio > 1.0) && (window.devicePixelRatio < 3.0)) ? 4.0 : window.devicePixelRatio;
     var resolution = new THREE.Vector2( winWidth*pixRatio, winHeight*pixRatio );
 
 
@@ -758,45 +758,6 @@
     min_bloomPass.threshold = 0.2; //0.1
     Graph.postProcessingComposer().addPass(min_bloomPass);
 
-
-    //tried to fix device pixel ratio for fxhas preview window
-    //https://stackoverflow.com/questions/16541676/what-are-best-practices-for-detecting-pixel-ratio-density
-    /*
-    function getDevicePixelRatio() {
-        var mediaQuery;
-        var is_firefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-        if (window.devicePixelRatio !== undefined && !is_firefox) {
-            return window.devicePixelRatio;
-        } else if (window.matchMedia) {
-            mediaQuery = "(-webkit-min-device-pixel-ratio: 1.5),\
-              (min--moz-device-pixel-ratio: 1.5),\
-              (-o-min-device-pixel-ratio: 3/2),\
-              (min-resolution: 1.5dppx)";
-            if (window.matchMedia(mediaQuery).matches) {
-                return 1.5;
-            }
-            mediaQuery = "(-webkit-min-device-pixel-ratio: 2),\
-              (min--moz-device-pixel-ratio: 2),\
-              (-o-min-device-pixel-ratio: 2/1),\
-              (min-resolution: 2dppx)";
-            if (window.matchMedia(mediaQuery).matches) {
-                return 2;
-            }
-            mediaQuery = "(-webkit-min-device-pixel-ratio: 0.75),\
-              (min--moz-device-pixel-ratio: 0.75),\
-              (-o-min-device-pixel-ratio: 3/4),\
-              (min-resolution: 0.75dppx)";
-            if (window.matchMedia(mediaQuery).matches) {
-                return 0.7;
-            }
-        } else {
-            return 1;
-        }
-    };
-
-    //calling above function - not sure if it works in production
-    //pixRatio = getDevicePixelRatio();
-    */
 
     //setting the dither pixel size adaptable to different devices
     var ditherPixelScale = 2.0 * pixRatio; //chromoplasm had factor of 4.0 * pixRatio
