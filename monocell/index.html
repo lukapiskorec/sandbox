@@ -1,0 +1,704 @@
+<head>
+  <style> body { margin: 0; } </style>
+  <script src="js/unpkg/three.js"></script>
+  <script src="js/unpkg/d3.js"></script>
+  <script src="js/unpkg/3d-force-graph.js"></script>
+  <script src="js/postprocessing/EffectComposer.js"></script>
+  <script src="js/postprocessing/RenderPass.js"></script>
+  <script src="js/postprocessing/MaskPass.js"></script>
+  <script src="js/postprocessing/ShaderPass.js"></script>
+  <script src="js/shaders/CopyShader.js"></script>
+  <script src="js/shaders/FXAAShader.js"></script>
+  <script src="js/shaders/C64Shader.js"></script>
+  <script src="js/shaders/MonocellShader.js"></script>
+  <script src="js/shaders/ConvolutionShader.js"></script>
+  <script src="js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/subdivision_module/subdivision.js"></script>
+
+  <script id="fxhash-snippet">
+  //---- do not edit the following code (you can indent as you wish)
+  let alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+  var fxhash = "oo" + Array(49).fill(0).map(_=>alphabet[(Math.random()*alphabet.length)|0]).join('')
+  let b58dec = (str) => str.split('').reduce((p,c,i) => p + alphabet.indexOf(c) * (Math.pow(alphabet.length, str.length-i-1)), 0)
+  let fxhashTrunc = fxhash.slice(2)
+  let regex = new RegExp(".{" + ((fxhashTrunc.length/4)|0) + "}", 'g')
+  let hashes = fxhashTrunc.match(regex).map(h => b58dec(h))
+  let sfc32 = (a, b, c, d) => {
+    return () => {
+      a |= 0; b |= 0; c |= 0; d |= 0
+      var t = (a + b | 0) + d | 0
+      d = d + 1 | 0
+      a = b ^ b >>> 9
+      b = c + (c << 3) | 0
+      c = c << 21 | c >>> 11
+      c = c + t | 0
+      return (t >>> 0) / 4294967296
+    }
+  }
+  var fxrand = sfc32(...hashes)
+  //---- /do not edit the following code
+</script>
+
+</head>
+<style>
+  .lowerleft
+    {
+        border-style: none;
+        margin-bottom: 1px;
+        margin-left : 1px;
+        width: 50px;
+        height: 50px;
+        background-color: transparent;
+        color: white;
+        position: fixed;
+        bottom: 0;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        cursor: pointer;
+    }
+  .lowerright
+    {
+        border-style: none;
+        margin-bottom: 1px;
+        margin-right : 1px;
+        width: 50px;
+        height: 50px;
+        background-color: transparent;
+        color: white;
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        cursor: pointer;
+
+    }
+</style>
+
+<body>
+  <div id="monocell"></div>
+  <button id="gif" class="lowerleft">o_o</button>
+  <button id="recenter" class="lowerright">><</button>
+
+  <script >
+
+  /*
+    FXHASH hash to random
+  */
+
+  //Settings
+  const start_bounds = 500.0;
+  const thick_mult = 2;
+
+  //assign random engine for specific implimentation
+  gene = fxrand;
+
+  //rand functions for random generator. Assumes generator producing float point between 0 and 1
+  function generateRandomInt(min,max){
+    return Math.floor((gene() * (max-min)) +min);
+  }
+
+  function gene_range(min,max){
+    return (gene() * (max-min)) +min;
+  }
+
+  function gene_pick_n(min, max, n){
+    var unique_list = [];
+    for (var i = 0; i < n; i++) {
+      unique_list.push(Math.floor((gene() * (max-min)) + min));
+    }
+    return unique_list
+  }
+
+  function gene_weighted_choice(data){
+    let total = 0;
+    for (let i = 0; i < data.length; ++i) {
+        total += data[i][1];
+    }
+    const threshold = gene() * total;
+    total = 0;
+    for (let i = 0; i < data.length - 1; ++i) {
+        total += data[i][1];
+        if (total >= threshold) {
+            return data[i][0];
+        }
+    }
+    return data[data.length - 1][0];
+  }
+
+  //rule decleration
+  rule_p = new RulePyramid_v2();
+  rule_t = new RuleTapered_v2();
+
+  //lattice gene assignment
+  const allel_p = [
+    ["box", 1],
+    ["dodecahedron", 1],
+  ];
+  var primitive = gene_weighted_choice(allel_p);
+  const allel_s = [
+    [0, 1],
+    [1, 20],
+    [2, 59],
+    [3, 20],
+  ];
+  var stage = gene_weighted_choice(allel_s);
+  const allel_0 = gene() < 0.5 ? 0 : 1;
+  const allel_1 = gene() < 0.5 ? 0 : 1;
+  const allel_2 = gene() < 0.5 ? 0 : 1;
+  var sub_rules = [allel_0, allel_1, allel_2];
+  const allel_3 = gene_range(-5, 5);
+  const allel_4 = gene_range(-5, 5);
+  const allel_5 = gene_range(-5, 5);
+  var extrude_face = [allel_3, allel_4, allel_5];
+  const allel_6 = gene_range(0.0, 0.95);
+  const allel_7 = gene_range(0.0, 0.95);
+  const allel_8 = gene_range(0.0, 0.95);
+  var contract_middle = [allel_6, allel_7, allel_8];
+  const allel_9 = gene() < 0.5 ? false : true;
+  const allel_10 = gene() < 0.5 ? false : true;
+  const allel_11 = gene() < 0.5 ? false : true;
+  var leave_middle = [allel_9, allel_10, allel_11]
+  const allel_12 = [
+    ['minimal', 1],
+    ['near', 2],
+    ['compact', 2],
+    //['middle', 2],
+    ['far', 2],
+    ['spread', 1],
+    ];
+  var connection_type = gene_weighted_choice(allel_12);
+  const allel_13 = [
+    ['none', 7],
+    ['near', 1],
+    ['middle', 1],
+    ['far', 1],
+    ['broken', 1],
+    ['absolute', 1]
+    ];
+
+
+
+  const allel_14 = [
+    ['symmetric', 4],
+    ['irregular', 1],
+  ];
+  var order_type = gene_weighted_choice(allel_14);
+  const allel_15 = [
+    [1, 1],
+    [3, 1],
+  ];
+
+
+  var degeneration_type;
+  if (stage == 1 || stage == 0) {
+   degeneration_type = "none";
+  } else if (stage == 3 || stage == 2) {
+   degeneration_type = gene_weighted_choice(allel_13);
+  }
+
+  var mod_rules;
+  if (order_type == "symmetric") {
+    mod_rules = [1, 1, 1];
+  } else if (order_type == "irregular") {
+    mod_rules = [gene_weighted_choice(allel_15), gene_weighted_choice(allel_15), gene_weighted_choice(allel_15)];
+  }
+
+  //overide
+
+ /*
+  primitive = "box";
+  stage = 3;
+  order_type = 'symmetric';
+  connection_type = 'middle';
+  degeneration_type = 'far';
+  sub_rules = [1, 0, 1];
+  mod_rules = [1, 1, 1];
+  extrude_face = [-3.5440192193797215, -3.23514235482095, 0.3231519469052957];
+  contract_middle = [0.4260727525428488, 0.293390980234336, 0.8579965248558341];
+  leave_middle = [true, true, false];
+ */
+
+  //print variant
+
+  const variant_genome = {
+    'primitive' : primitive,
+    'stage' : stage,
+    'order_type' : order_type,
+    'connection_type' : connection_type,
+    'degeneration_type' : degeneration_type,
+    'sub_rules' : sub_rules,
+    'extrude_face' : extrude_face,
+    'contract_middle' : contract_middle,
+    'leave_middle' : leave_middle
+  }
+
+  //const variant = [primitive, stage, order_type, connection_type, degeneration_type];
+  const variant_parts = [];
+  Object.keys(variant_genome).forEach(key => {
+    if (!(variant_genome[key] instanceof Array)) {
+      variant_parts.push(variant_genome[key])
+    }
+  });
+
+  const variant_name = "monocell_" + variant_parts.join('_');
+
+  console.log(variant_name);
+  Object.keys(variant_genome).forEach(key => {
+    console.log(key, '->', variant_genome[key]);
+  });
+
+
+  // Lattice Generation Steps
+
+  // Starting Primitive
+  var start_mesh;
+
+  if (primitive == "box") {
+    start_mesh = new Box(0,0,0, start_bounds, start_bounds, start_bounds)
+  } else if (primitive == "dodecahedron") {
+    start_mesh = new Dodecahedron(0,0,0, start_bounds)
+  }
+
+  var lattice_mesh = start_mesh.get_mesh();
+
+  // Apply Rules
+
+  for (var i = 0; i < 3; i++) {
+    if (stage >= i+1) {
+      //console.log("]]]]]Stage:", i)
+      if (sub_rules[i] == 0) {
+        lattice_mesh = rule_p.replace(lattice_mesh, extrude_face[i], mod_rules[i]);
+      } else {
+        lattice_mesh = rule_t.replace(lattice_mesh, contract_middle[i], extrude_face[i], leave_middle[i], mod_rules[i])
+      }
+    }
+  }
+
+  // Get Data from Mesh & Compute layers
+  var gData = mesh_to_gData(lattice_mesh)
+
+
+
+  //Generate level sequence
+
+  const allel_16 = [
+    //[1, 2],
+    //[2, 2],
+    [3, 2],
+    [4, 1],  //Added larger
+    [5, 1],  //Added larger
+  ];
+
+  const allel_17 = [
+    [1, 1],
+    [2, 1],
+  ];
+
+  var layer_length = Object.keys(gData['layers']).length;
+
+  var layers= [0];
+  if (connection_type == "near") {
+    var nr_layers = gene_weighted_choice(allel_16)
+    if (layer_length > nr_layers) {
+      for (var i = 1; i < nr_layers; i++) {
+        layers.push(i)
+      }
+    } else {
+      layers.push(1)
+    }
+  } else if (connection_type == "compact") {
+    for (var i = 1; i < gene_weighted_choice(allel_16); i++) {
+    layers.push(i)
+    }
+  } else if (connection_type == "far") {
+
+    var nr_layers = gene_weighted_choice(allel_16)
+    if (layer_length > nr_layers) {
+      for (var i = 1; i < nr_layers; i++) {
+        layers.push(layer_length-i-1)
+      }
+    } else {
+        layers.push(layer_length-1)
+    }
+  } else if (connection_type == "spread") {
+    if (layer_length > 5) {
+      for (var i = 1; i < 5; i++) {
+        layers.push(parseInt(gene_range(1, layer_length-1)))
+      }
+    } else if (layer_length > 2) {
+      for (var i = 1; i < layer_length; i++) {
+        layers.push(parseInt(gene_range(1, layer_length-1)))
+      }
+    }
+
+  }
+
+
+
+   //const percentage = 1.0 //this corresponds to 100%, or all links in a level
+   //const destruction_percentage = 0.1 //precentage of nodes removed randomly if degeneration_type = "broken"
+   var deactivate_layers = []; //
+   if (degeneration_type == "near") {
+     var nr_layers = gene_weighted_choice(allel_17)
+     if (layer_length > nr_layers) {
+         deactivate_layers.push(nr_layers) //gData['layers'].length-i-1
+     } else {
+       deactivate_layers.push(0)
+     }
+   } else if (degeneration_type == "middle") {
+     deactivate_layers.push(parseInt(layer_length/2))
+   } else if (degeneration_type == "far") {
+     var nr_layers = gene_weighted_choice(allel_17)
+     if (layer_length > nr_layers) {
+       for (var i = 0; i < nr_layers; i++) {
+         deactivate_layers.push(layer_length-i-1)
+       }
+     }
+   } else if (degeneration_type == "absolute") {
+      //Randomly decompose to nothing
+   } else if (degeneration_type == "broken") {
+       //console.log(layer_length)
+       deactivate_layers.push(layer_length-1)
+   }
+
+
+
+   var added_links = 0;
+   for (var i = 0; i < layers.length; i++) {
+     var layer_key = Object.keys(gData['layers'])[layers[i]]
+     for (var j = 0; j < gData['layers'][layer_key].length; j++) {
+       var link = gData['layers'][layer_key][j]['link'];
+       gData['links'].push({source: link[0], target: link[1], value:100, 'visible':false, 'state':i+1}) //For actual length gData['layers'][layer_key][i]['layer']
+       added_links ++;
+     }
+   }
+
+   console.log("selected layers ->", layers, ' Added Anim links ->', added_links)
+   console.log("deactivate layers ->", deactivate_layers)
+   var dnodes = [];
+   for (var i = 0; i < deactivate_layers.length; i++) {
+     var layer_key = Object.keys(gData['layers'])[deactivate_layers[i]]
+     for (var j = 0; j < gData['layers'][layer_key].length; j++) {
+       var link = gData['layers'][layer_key][j]['link']
+       for (var i = 0; i < gData.links.length; i++) {
+         var e = gData.links[i];
+         if (e.source == link[0] || e.target == link[1] || e.source == link[1] || e.target == link[0] ){
+           dnodes.push(e);
+         }
+       }
+     }
+   }
+
+   if (degeneration_type == 'absolute') {
+     dnodes.push(...gData.links)
+   }
+   //console.log("links: ", gData.links.length)
+   //console.log("nodes: ", gData.nodes.length)
+   //console.log("Dnodes: ", dnodes.length)
+
+   dnodes = [...new Set(dnodes)]
+
+   //console.log("Unique Dnodes: ", dnodes.length)
+
+
+
+
+
+   //FXHASH
+   window.$fxhashFeatures = {
+   "Primitive": primitive,
+   "Stage": stage,
+   "Magnitude": Math.floor(Math.log10(gData.nodes.length)) + 1,
+   "Order": order_type,
+   "Rules": sub_rules.toString(),
+   "Connection": connection_type,
+   "Degeneration": degeneration_type
+   }
+
+
+
+
+     var total_nodes = gData.nodes.length;
+     console.log("number of nodes ->", total_nodes);
+     console.log("magnitude ->", Math.floor(Math.log10(gData.nodes.length)) + 1);
+
+
+     //setting the rendering parameter based on the number of nodes
+     if (total_nodes < 50) {
+       var ditherPixelScale = 2.0;
+       var nodeSize = 5;
+       var linkThickness = 1.0*thick_mult;
+       var bloomReduction = 1.0;
+     } else if (total_nodes < 100) {
+       var ditherPixelScale = 2.0;
+       var nodeSize = 15;
+       var linkThickness = 1.0*thick_mult;
+       var bloomReduction = 2.0;
+     } else if (total_nodes < 500) {
+       var ditherPixelScale = 1.0;
+       var nodeSize = 25;
+       var linkThickness = 1.5;
+       var bloomReduction = 2.0;
+     } else {
+       var ditherPixelScale = 1.0;
+       var nodeSize = 25;
+       var linkThickness = 2.0*thick_mult;
+       var bloomReduction = 3.0;
+     }
+
+    //if (connection_type == "spread") {
+    //  bloomReduction = bloomReduction*4;
+    //}
+
+
+
+    const elem = document.getElementById('monocell');
+
+    var Graph;
+
+    function monocell () {
+
+    Graph = ForceGraph3D()(elem)
+    .graphData(gData)
+    .d3VelocityDecay(0.15)
+    .enableNavigationControls(true)
+    .showNavInfo(false)
+    .nodeRelSize(nodeSize)
+    .nodeResolution(10)
+	  .nodeColor('white') //node => nodeColorScale(node.connectivity)
+    .nodeOpacity(0)
+    .linkOpacity(1)
+	  .linkResolution(10)
+    .linkWidth(linkThickness)
+    .linkMaterial('LineBasicMaterial') //or 'MeshLambertMaterial'
+    .d3Force('collision', d3.forceCollide(node => 0))
+    .onNodeClick(node => {
+        // Aim at node from outside it
+        const distance = 40;
+        const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+        Graph.cameraPosition(
+          { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, // new position
+          node, // lookAt ({ x, y, z })
+          3000  // ms transition duration
+        );
+      })
+    .linkVisibility(link=> link.visible)
+    //link.source.visible && link.target.visible
+
+    // few ticks to start
+    //Graph.warmupTicks(10);
+
+	  // fit to canvas when engine stops
+	  Graph.onEngineStop(() => Graph.zoomToFit(400));
+
+    const nodeForce = Graph
+      .d3Force('charge')
+
+    //console.log(nodeForce.strength(link => link))
+
+    const linkForce = Graph
+      .d3Force('link')
+      //.distance(link => (link.source.connectivity+link.target.connectivity)/2 + link.value);
+
+    var winWidth = window.innerWidth;
+    var winHeight =  window.innerHeight;
+    var scale = window.devicePixelRatio;
+
+    //Bloom
+    const bloomPass = new THREE.UnrealBloomPass();
+    bloomPass.strength = 3.0;
+    bloomPass.radius = 1.0;
+    bloomPass.threshold = 0.1;
+    Graph.postProcessingComposer().addPass(bloomPass);
+
+    const min_bloomPass = new THREE.UnrealBloomPass();
+    min_bloomPass.strength = 1.0;
+    min_bloomPass.radius = 0.1;
+    min_bloomPass.threshold = 0.1;
+    Graph.postProcessingComposer().addPass(min_bloomPass);
+
+
+    //Dither
+    var effectDither = new THREE.ShaderPass( THREE.MonocellShader );
+    effectDither.uniforms[ 'grayScale' ].value = 1;
+    effectDither.uniforms[ 'pixelScale' ].value = ditherPixelScale;
+    Graph.postProcessingComposer().addPass(effectDither);
+
+
+    function isInactiveLink(link) {
+      //console.log(link.state)
+      if (parseInt(link.state)  < 0) {
+        return true;
+      } else {
+        return false
+      }
+    }
+
+
+    linkForce.strength(link => {
+      if (parseInt(link.state) > 0) {
+      return 0 //Animation
+    } else if (parseInt(link.state) < 0) {
+      return 0.0001 //Broken Links
+    } else { return 0.1} //MonoGrid
+    })
+    linkForce.distance(link => link.value)
+    //linkForce.strength(link => console.log())
+
+
+    //Degeneration
+
+    var link_index = 0;
+    var assemble = false;
+    var delay = false;
+
+    //console.log("nodes to cycle through:", dnodes.length)
+
+    setInterval(() => {
+    if (!(degeneration_type == "none")) {
+      if (assemble == false && link_index < dnodes.length) {
+      var e = dnodes[link_index]
+        gData.links.splice(gData.links.indexOf(e), 1)
+        link_index++;
+        Graph.linkThreeObject(link => {})
+          .linkPositionUpdate((line, { start, end }) => {
+        const linePos = line.geometry.getAttribute('position');
+        linePos.needsUpdate = true;
+      });
+    } else if (link_index == dnodes.length || link_index == -1) {
+        if (delay == false) {
+          delay = setTimeout(() => {
+            assemble = !assemble;
+            if (assemble) {
+              link_index--;
+            } else {
+              link_index++;
+            }
+            delay = false
+          }, 2000)
+        }
+
+
+      } else if (assemble == true) {
+        gData.links.push(dnodes[link_index])
+        link_index--;
+        Graph.linkThreeObject(link => {})
+          .linkPositionUpdate((line, { start, end }) => {
+        const linePos = line.geometry.getAttribute('position');
+        linePos.needsUpdate = true;
+      });
+      }
+
+    }
+
+}, 50);
+
+    //Connection - Animate link layers
+
+    let seq = 0;
+    setInterval(() => {
+      //console.log("SEQ: ", seq % layers.length)
+      linkForce.strength(link => {
+        if (parseInt(link.state) == 0) {
+          return 0.1
+        } else if (seq % layers.length == parseInt(link.state)) {
+          return 0.1
+        } else {
+          return 0.0001
+        }
+      })
+      seq ++
+
+    }, 3000);
+
+    // Recenter
+    setTimeout(() => {
+      Graph.zoomToFit(400);
+    }, 1000)
+
+    //AutoPulse
+    let pulse = 0;
+
+    setInterval(() => {
+      linkForce.distance(link => {
+        return (parseInt(link.state) >= 0 ? 0:1) * 10 * Math.sin(pulse) * (link.source.connectivity+link.target.connectivity)/2 + link.value;
+      })
+      bloomPass.strength = Math.sin(pulse + Math.PI) / bloomReduction;
+      Graph.numDimensions(3);
+      pulse += Math.PI / 160;
+    }, 10);
+    }
+
+    window.addEventListener('resize', () => {
+         Graph.height(window.innerHeight);
+         Graph.width(window.innerWidth);
+    });
+
+    const handler = (e) => {
+        monocell();
+    };
+
+    const recorder = (e) => {
+      const canvas = document.querySelector("canvas");
+      const recenterBtn = document.getElementById('recenter');
+      const recordBtn = document.getElementById('gif');
+      let recording = false;
+      let mediaRecorder;
+      let recordedChunks;
+
+      recenterBtn.addEventListener("click", () => {
+        Graph.zoomToFit(400);
+      });
+
+      recordBtn.addEventListener("click", () => {
+        recording = !recording;
+          if(recording){
+                  recordBtn.textContent = "x";
+                  const stream = canvas.captureStream(25);
+                  mediaRecorder = new MediaRecorder(stream, {
+                      mimeType: 'video/webm;codecs=vp9',
+                      ignoreMutedMedia: true
+                  });
+                  recordedChunks = [];
+                  mediaRecorder.ondataavailable = e => {
+                      if(e.data.size > 0){
+                          recordedChunks.push(e.data);
+                      }
+                  };
+                  mediaRecorder.start();
+              } else {
+                  recordBtn.textContent = "o_o"
+                  mediaRecorder.stop();
+                  setTimeout(() => {
+                      const blob = new Blob(recordedChunks, {
+                          type: "video/webm"
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = variant_name + ".webm";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                  },0);
+              }
+      });
+    };
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+      handler();
+      recorder();
+    });
+  </script>
+</body>
