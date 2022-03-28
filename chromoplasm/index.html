@@ -1,0 +1,997 @@
+<head>
+  <style> body { margin: 0; } </style>
+  <script src="js/unpkg/three.js"></script>
+  <script src="js/unpkg/d3.js"></script>
+  <script src="js/unpkg/3d-force-graph.js"></script>
+  <script src="js/postprocessing/EffectComposer.js"></script>
+  <script src="js/postprocessing/RenderPass.js"></script>
+  <script src="js/postprocessing/MaskPass.js"></script>
+  <script src="js/postprocessing/ShaderPass.js"></script>
+  <script src="js/shaders/CopyShader.js"></script>
+  <script src="js/shaders/FXAAShader.js"></script>
+  <script src="js/shaders/C64Shader.js"></script>
+  <script src="js/shaders/MonocellShader.js"></script>
+  <script src="js/shaders/ConvolutionShader.js"></script>
+  <script src="js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/subdivision_module/subdivision.js"></script>
+  <script src="js/palettes/ProtocellsColorPalette.js"></script>
+
+  <script id="fxhash-snippet">
+    //---- do not edit the following code (you can indent as you wish)
+    let alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+    var fxhash = "oo" + Array(49).fill(0).map(_=>alphabet[(Math.random()*alphabet.length)|0]).join('')
+    let b58dec = str=>[...str].reduce((p,c)=>p*alphabet.length+alphabet.indexOf(c)|0, 0)
+    let fxhashTrunc = fxhash.slice(2)
+    let regex = new RegExp(".{" + ((fxhashTrunc.length/4)|0) + "}", 'g')
+    let hashes = fxhashTrunc.match(regex).map(h => b58dec(h))
+    let sfc32 = (a, b, c, d) => {
+      return () => {
+        a |= 0; b |= 0; c |= 0; d |= 0
+        var t = (a + b | 0) + d | 0
+        d = d + 1 | 0
+        a = b ^ b >>> 9
+        b = c + (c << 3) | 0
+        c = c << 21 | c >>> 11
+        c = c + t | 0
+        return (t >>> 0) / 4294967296
+      }
+    }
+    var fxrand = sfc32(...hashes)
+    // true if preview mode active, false otherwise
+    // you can append preview=1 to the URL to simulate preview active
+    var isFxpreview = new URLSearchParams(window.location.search).get('preview') === "1"
+    // call this method to trigger the preview
+    function fxpreview() {
+      console.log("fxhash: TRIGGER PREVIEW")
+    }
+    //---- /do not edit the following code
+  </script>
+
+
+</head>
+<style>
+  .lowerleft
+    {
+        border-style: none;
+        margin-bottom: 1px;
+        margin-left : 1px;
+        width: 50px;
+        height: 50px;
+        background-color: transparent;
+        color: white;
+        position: fixed;
+        bottom: 0;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        cursor: pointer;
+    }
+  .lowerright
+    {
+        border-style: none;
+        margin-bottom: 1px;
+        margin-right : 1px;
+        width: 50px;
+        height: 50px;
+        background-color: transparent;
+        color: white;
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        cursor: pointer;
+    }
+
+
+</style>
+
+<body>
+  <div id="chromoplasm"></div>
+  <button id="gif" class="lowerleft">o_o</button>
+  <button id="recenter" class="lowerright">><</button>
+
+  <script >
+
+  //Date Today
+  var now = new Date();
+
+
+  var dynamic_track = false;
+  /*
+    FXHASH hash to random
+  */
+
+  //Settings
+  const start_bounds = 500.0;
+  const thick_mult = 50; // const thick_mult = 2
+
+  //assign random engine for specific implimentation
+  gene = fxrand;
+
+  //rand functions for random generator. Assumes generator producing float point between 0 and 1
+  function generateRandomInt(min,max){
+    return Math.floor((gene() * (max-min)) +min);
+  }
+
+  function gene_range(min,max){
+    return (gene() * (max-min)) +min;
+  }
+
+  function gene_pick_n(min, max, n){
+    var unique_list = [];
+    for (var i = 0; i < n; i++) {
+      unique_list.push(Math.floor((gene() * (max-min)) + min));
+    }
+    return unique_list
+  }
+
+  function gene_weighted_choice(data){
+    let total = 0;
+    for (let i = 0; i < data.length; ++i) {
+        total += data[i][1];
+    }
+    const threshold = gene() * total;
+    total = 0;
+    for (let i = 0; i < data.length - 1; ++i) {
+        total += data[i][1];
+        if (total >= threshold) {
+            return data[i][0];
+        }
+    }
+    return data[data.length - 1][0];
+  }
+
+  //rule decleration
+  rule_p = new RulePyramid_v2();
+  rule_t = new RuleTapered_v2();
+
+  //lattice gene assignment
+  const allel_p = [
+    ["box", 1],
+    ["dodecahedron", 1],
+  ];
+  var primitive = gene_weighted_choice(allel_p);
+  const allel_s = [
+    //[0, 1],
+    [1, 10],
+    [2, 40],
+    [3, 40],
+    [4, 10],
+    //[5, 5]
+  ];
+  var stage = gene_weighted_choice(allel_s);
+  const allel_0 = gene() < 0.5 ? 0 : 1;
+  const allel_1 = gene() < 0.5 ? 0 : 1;
+  const allel_2 = gene() < 0.5 ? 0 : 1;
+  var sub_rules = [allel_0, allel_1, allel_2];
+  const allel_3 = gene_range(-5, 5);
+  const allel_4 = gene_range(-5, 5);
+  const allel_5 = gene_range(-5, 5);
+  var extrude_face = [allel_3, allel_4, allel_5];
+  const allel_6 = gene_range(0.0, 0.95);
+  const allel_7 = gene_range(0.0, 0.95);
+  const allel_8 = gene_range(0.0, 0.95);
+  var contract_middle = [allel_6, allel_7, allel_8];
+  const allel_9 = gene() < 0.5 ? false : true;
+  const allel_10 = gene() < 0.5 ? false : true;
+  const allel_11 = gene() < 0.5 ? false : true;
+  var leave_middle = [allel_9, allel_10, allel_11]
+  const allel_12 = [
+    ['minimal', 1],
+    ['near', 2],
+    ['compact', 2],
+    //['middle', 2],
+    ['far', 2],
+    ['spread', 1],
+    ];
+  var reconfiguration = gene_weighted_choice(allel_12);
+  const allel_13 = [
+    ['none', 10],
+    ['near', 1],
+    ['middle', 1],
+    ['far', 1],
+    ['broken', 1],
+    ['absolute', 1]
+    ];
+
+
+  const allel_14 = [
+    ['symmetric', 4],
+    ['irregular', 1],
+  ];
+  var order_type = gene_weighted_choice(allel_14);
+  const allel_15 = [
+    [1, 1],
+    [3, 1],
+  ];
+
+
+  var degeneration_type;
+  if (stage == 1 || stage == 0) {
+   degeneration_type = "none";
+   order_type = "symmetric";
+  } else if (stage == 3 || stage == 2) {
+    if (stage == 2) {
+      order_type = "symmetric";
+    }
+   degeneration_type = gene_weighted_choice(allel_13);
+ } else if (stage == 4 || stage == 5) {
+   degeneration_type = gene_weighted_choice(allel_13);
+   primitive = "box" //overide
+ }
+
+  var mod_rules;
+  if (order_type == "symmetric") {
+    mod_rules = [1, 1, 1];
+  } else if (order_type == "irregular") {
+    mod_rules = [gene_weighted_choice(allel_15), gene_weighted_choice(allel_15), gene_weighted_choice(allel_15)];
+  }
+
+  const allel_18 = gene() < 0.5 ? 0 : 1;
+  const background = ['#ffffff', '#000000'][allel_18];
+  const allel_19 = [
+    ['none', 1],
+    ['alternate', 3],
+    ['half', 3],
+    ['random',3],
+    ['all',3]
+    ];
+  const allel_20 = [
+    ['monochrome', 10],
+    ['semi-monochrome', 10],
+    ['pure', 10],
+    ['semi-pure', 10],
+    ['spectrum', 45],
+    ['connectivity', 5],
+    ['random', 4],
+    ['rainbow', 1]
+    ]
+  const allel_21 = [
+    ['random', 4],
+    ['relative', 3],
+    ['similar', 1],
+    ['dynamic', 2]
+    ]
+
+    if (!allel_18) {
+      document.getElementById('recenter').style["color"] = "black";
+      document.getElementById('gif').style["color"] = "black";
+    }
+
+  const modulation = gene_weighted_choice(allel_19);
+  var palette = gene_weighted_choice(allel_20);
+  var node_size = gene_weighted_choice(allel_21);
+
+
+
+
+  //overide
+  var day = now.getDate()
+  var month = now.getMonth()
+  if (day == 1 && month == 0) {
+    degeneration_type = 'absolute';
+    node_size = 'dynamic';
+  }
+    //degeneration_type = 'absolute';
+    //palette = 'connectivity'
+    //reconfiguration = 'minimal';
+    //order_type = 'irregular';
+    //primitive = "box";
+    //stage = 4;
+   /*
+    primitive = "box";
+    stage = 3;
+    order_type = 'symmetric';
+    reconfiguration = 'middle';
+    degeneration_type = 'far';
+    sub_rules = [1, 0, 1];
+    mod_rules = [1, 1, 1];
+    extrude_face = [-3.5440192193797215, -3.23514235482095, 0.3231519469052957];
+    contract_middle = [0.4260727525428488, 0.293390980234336, 0.8579965248558341];
+    leave_middle = [true, true, false];
+    modulation = "none";
+   */
+
+  //print variant
+  const node_mode = ['random', 'relative', 'similar', 'dynamic'].indexOf(node_size)
+
+  const variant_genome = {
+    'primitive' : primitive,
+    'stage' : stage,
+    'order_type' : order_type,
+    'reconfiguration' : reconfiguration,
+    'modulation' : modulation,
+    'degeneration_type' : degeneration_type,
+    'sub_rules' : sub_rules,
+    'extrude_face' : extrude_face,
+    'contract_middle' : contract_middle,
+    'leave_middle' : leave_middle,
+    'background' : ['white', 'black'][allel_18],
+    'palette' : palette,
+    'node_size' : node_size,
+  }
+
+  const variant_parts = [];
+  Object.keys(variant_genome).forEach(key => {
+    if (!(variant_genome[key] instanceof Array)) {
+      variant_parts.push(variant_genome[key])
+    }
+  });
+
+  const variant_name = "chromoplasm_" + variant_parts.join('_');
+
+  console.log(variant_name);
+  Object.keys(variant_genome).forEach(key => {
+    console.log(key, '->', variant_genome[key]);
+  });
+
+  // Lattice Generation Steps
+
+  // Starting Primitive
+  var start_mesh;
+
+  if (primitive == "box") {
+    start_mesh = new Box(0,0,0, start_bounds, start_bounds, start_bounds)
+  } else if (primitive == "dodecahedron") {
+    start_mesh = new Dodecahedron(0,0,0, start_bounds)
+  }
+
+  var lattice_mesh = start_mesh.get_mesh();
+
+  // Apply Rules
+
+  for (var i = 0; i < 5; i++) {
+    if (stage >= i+1) {
+      //console.log("]]]]]Stage:", i)
+      if (sub_rules[i] == 0) {
+        lattice_mesh = rule_p.replace(lattice_mesh, extrude_face[i], mod_rules[i]);
+      } else {
+        lattice_mesh = rule_t.replace(lattice_mesh, contract_middle[i], extrude_face[i], leave_middle[i], mod_rules[i])
+      }
+    }
+  }
+
+  // Get Data from Mesh & Compute layers
+  var gData = mesh_to_gData(lattice_mesh)
+
+
+
+  //Generate level sequence
+
+  const allel_16 = [
+    //[1, 2],
+    //[2, 2],
+    [3, 2],
+    [4, 1],  //Added larger
+    [5, 1],  //Added larger
+  ];
+
+  const allel_17 = [
+    [1, 1],
+    [2, 1],
+  ];
+
+  var layer_length = Object.keys(gData['layers']).length;
+
+  var layers= [0];
+  if (reconfiguration == "near") {
+    var nr_layers = gene_weighted_choice(allel_16)
+    if (layer_length > nr_layers) {
+      for (var i = 1; i < nr_layers; i++) {
+        layers.push(i)
+      }
+    } else {
+      layers.push(1)
+    }
+  } else if (reconfiguration == "compact") {
+    for (var i = 1; i < gene_weighted_choice(allel_16); i++) {
+    layers.push(i)
+    }
+  } else if (reconfiguration == "far") {
+
+    var nr_layers = gene_weighted_choice(allel_16)
+    if (layer_length > nr_layers) {
+      for (var i = 1; i < nr_layers; i++) {
+        layers.push(layer_length-i-1)
+      }
+    } else {
+        layers.push(layer_length-1)
+    }
+  } else if (reconfiguration == "spread") {
+    if (layer_length > 5) {
+      for (var i = 1; i < 5; i++) {
+        layers.push(parseInt(gene_range(1, layer_length-1)))
+      }
+    } else if (layer_length > 2) {
+      for (var i = 1; i < layer_length; i++) {
+        layers.push(parseInt(gene_range(1, layer_length-1)))
+      }
+    }
+  }
+
+  gData['unique_edge_lengths'].splice(0, 0, 100); //add 100 as it seems preasent everywhere
+  var nr_unique_edge_lengths = gData['unique_edge_lengths'].length;
+  var randallel = [
+  [0,1],
+  [1,1],
+  [2,2],
+  ]
+
+  const modulation_pattern = [];
+  if (modulation == "none") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+        modulation_pattern.push(2); //some number larger than one to disable
+      }
+  } else if (modulation == "alternate") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+      if (i%2 == 0) {
+        modulation_pattern.push(0);
+      } else {
+        modulation_pattern.push(1);
+      }
+
+    }
+  } else if (modulation == "half") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+      if (i <= nr_unique_edge_lengths/2) {
+        modulation_pattern.push(0);
+      } else {
+        modulation_pattern.push(1);
+      }
+    }
+  } else if (modulation == "all") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+        modulation_pattern.push(0);
+      }
+  } else if (modulation == "random") {
+    for (var i = 0; i < nr_unique_edge_lengths; i++) {
+        modulation_pattern.push(gene_weighted_choice(randallel));
+      }
+  }
+
+
+   //const percentage = 1.0 //this corresponds to 100%, or all links in a level
+   //const destruction_percentage = 0.1 //precentage of nodes removed randomly if degeneration_type = "broken"
+   var deactivate_layers = []; //
+   if (degeneration_type == "near") {
+     var nr_layers = gene_weighted_choice(allel_17)
+     if (layer_length > nr_layers) {
+         deactivate_layers.push(nr_layers) //gData['layers'].length-i-1
+     } else {
+       deactivate_layers.push(0)
+     }
+   } else if (degeneration_type == "middle") {
+     deactivate_layers.push(parseInt(layer_length/2))
+   } else if (degeneration_type == "far") {
+     var nr_layers = gene_weighted_choice(allel_17)
+     if (layer_length > nr_layers) {
+       for (var i = 0; i < nr_layers; i++) {
+         deactivate_layers.push(layer_length-i-1)
+       }
+     }
+   } else if (degeneration_type == "absolute") {
+      //Randomly decompose to nothing
+   } else if (degeneration_type == "broken") {
+       //console.log(layer_length)
+       deactivate_layers.push(layer_length-1)
+   }
+
+
+
+   var added_links = 0;
+   for (var i = 0; i < layers.length; i++) {
+     var layer_key = Object.keys(gData['layers'])[layers[i]]
+     for (var j = 0; j < gData['layers'][layer_key].length; j++) {
+       var link = gData['layers'][layer_key][j]['link'];
+       gData['links'].push({source: link[0], target: link[1], value:100, 'visible':false, 'state':i+1}) //For actual length gData['layers'][layer_key][i]['layer']
+       added_links ++;
+     }
+   }
+
+   //console.log("selected layers ->", layers, ' Added Anim links ->', added_links)
+   //console.log("deactivate layers ->", deactivate_layers)
+   var dnodes = [];
+   for (var i = 0; i < deactivate_layers.length; i++) {
+     var layer_key = Object.keys(gData['layers'])[deactivate_layers[i]]
+     for (var j = 0; j < gData['layers'][layer_key].length; j++) {
+       var link = gData['layers'][layer_key][j]['link']
+       for (var i = 0; i < gData.links.length; i++) {
+         var e = gData.links[i];
+         if (e.source == link[0] || e.target == link[1] || e.source == link[1] || e.target == link[0] ){
+           dnodes.push(e);
+         }
+       }
+     }
+   }
+
+   if (degeneration_type == 'absolute') {
+     dnodes.push(...gData.links)
+   }
+
+   dnodes = [...new Set(dnodes)]
+
+   //FXHASH
+   window.$fxhashFeatures = {
+   "Primitive": primitive,
+   "Stage": stage,
+   "Magnitude": Math.floor(Math.log10(gData.nodes.length)) + 1,
+   "Order": order_type,
+   //"Rules": sub_rules.toString(),
+   "Reconfiguration": reconfiguration,
+   "Modulation": modulation,
+   "Degeneration": degeneration_type,
+   "Background": ['white', 'black'][allel_18],
+   "Palette": palette,
+   "Node Size": node_size,
+   }
+
+
+     var total_nodes = gData.nodes.length;
+     console.log("number of nodes ->", total_nodes);
+     console.log("magnitude ->", Math.floor(Math.log10(gData.nodes.length)) + 1);
+
+
+     //setting the rendering parameter based on the number of nodes
+     if (total_nodes < 50) {
+       var ditherPixelScale = 2.0;
+       var nodeSize = 5;
+       var linkThickness = 1.0*thick_mult;
+       var bloomReduction = 1.0;
+     } else if (total_nodes < 100) {
+       var ditherPixelScale = 2.0;
+       var nodeSize = 15;
+       var linkThickness = 1.0*thick_mult;
+       var bloomReduction = 2.0;
+     } else if (total_nodes < 500) {
+       var ditherPixelScale = 1.0;
+       var nodeSize = 25;
+       var linkThickness = 1.5;
+       var bloomReduction = 2.0;
+     } else {
+       var ditherPixelScale = 1.0;
+       var nodeSize = 25;
+       var linkThickness = 2.0*thick_mult;
+       var bloomReduction = 3.0;
+     }
+
+     //link thickness override
+     var linkThickness = 5.0;
+
+    //define new material - flat white, no shading
+    const material_line_basic = new THREE.Material();
+    material_line_basic.color = new THREE.Color( 0xffffff );
+    material_line_basic.type = 'LineBasicMaterial';
+    material_line_basic.linewidth = 1;
+    material_line_basic.linecap = 'round';
+    material_line_basic.linejoin = 'round';
+    material_line_basic.transparent = true;
+    material_line_basic.opacity = 0.0;
+
+
+    const Palette = ProtocellsColorPalette;
+    //Selects a palette from the palette theme group
+    var palette_idx = generateRandomInt(0, Palette[palette].length);
+
+    const in_case_of_common_size = gene();
+
+    function invert_whites(colour) {
+      if (colour == '#ffffff') {
+        return '#000000'
+      } else {return colour}
+    }
+
+    function calculate_size(mode, node) {
+      if (mode == 0) {
+        return gene() * 50 + 25
+      } else if (mode == 1) {
+        return (node.connectivity/5) * 50 + 25
+      } else if (mode == 2) {
+        return in_case_of_common_size * 50 + 25
+      } else if (mode == 3) {
+        return gene() * 50 + 25
+      }
+    }
+
+    //generateRandomInt(min,max)
+
+    const elem = document.getElementById('chromoplasm');
+    const d3VelocityDecay = 0.10;
+
+    var Graph;
+
+    function chromoplasm () {
+
+    Graph = ForceGraph3D()(elem)
+    .graphData(gData)
+    .d3VelocityDecay(d3VelocityDecay) // original 0.01
+    .enableNavigationControls(true)
+    .showNavInfo(false)
+    .backgroundColor(background)
+
+    //.nodeRelSize(50) //originally set to nodeSize
+    //.nodeResolution(10)
+    //.nodeColor(0xff0000) //'white'
+    //.nodeOpacity(1)
+
+
+    //custom node geometry
+    //https://github.com/vasturiano/3d-force-graph/blob/master/example/custom-node-geometry/index.html
+    .nodeThreeObject(node => {
+      var current_size = calculate_size(node_mode, node);
+      //console.log(current_size)
+      return new THREE.Mesh(
+      //SphereGeometry(radius : Float, widthSegments : Integer, heightSegments : Integer, ...)
+      new THREE.SphereGeometry(current_size, 15, 15),
+      new THREE.LineBasicMaterial({
+        //color: 0 == allel_18 ? invert_whites(Palette[palette][palette_idx][generateRandomInt(0, Palette[palette][palette_idx].length)]) : Palette[palette][palette_idx][generateRandomInt(0, Palette[palette][palette_idx].length)],
+        color: 0 == allel_18 ? invert_whites(Palette[palette][palette_idx][(node.id % Palette[palette][palette_idx].length)]) : Palette[palette][palette_idx][(node.id % Palette[palette][palette_idx].length)],
+        transparent: true,
+        opacity: node_mode == 2 ?  0.75 : 0.25 + (1-current_size/250)*0.75
+      })
+    )
+    }
+    )
+    //.d3Force('collide', d3.forceCollide(Graph.nodeRelSize())) //TODO CHANGE FOR EACH NODE BASED ON GENERATED RAIDIUS
+
+    //.linkWidth(linkThickness)
+    //.linkMaterial('white') //or material_line_basic, 'white', 'MeshLambertMaterial', 'MeshNormalMaterial', 'LineBasicMaterial'
+    .linkOpacity(0.0)
+	  .linkResolution(0)
+    //.backgroundColor(Palette["ColorHunt"][palette_idx][0])
+
+    //.d3Force('collision', d3.forceCollide(node => 0))
+    .onNodeClick(node => {
+        // Aim at node from outside it
+        const distance = 40;
+        const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+        Graph.cameraPosition(
+          { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, // new position
+          node, // lookAt ({ x, y, z })
+          3000  // ms transition duration
+        );
+      })
+    //.linkVisibility(link=> link.visible)
+    //link.source.visible && link.target.visible
+
+    // few ticks to start
+    //Graph.warmupTicks(10);
+
+	  // fit to canvas when engine stops
+	  //Graph.onEngineStop(() => Graph.zoomToFit(400));
+
+    //const nodeForce = Graph
+    //  .d3Force('charge')
+
+    //console.log(nodeForce.strength(link => link))
+
+    const linkForce = Graph
+      .d3Force('link')
+      //.distance(link => (link.source.connectivity+link.target.connectivity)/2 + link.value);
+
+
+    var winWidth = window.innerWidth;
+    var winHeight =  window.innerHeight;
+    var pixRatio = window.devicePixelRatio;
+    var resolution = new THREE.Vector2( winWidth*pixRatio, winHeight*pixRatio );
+
+
+
+    //Bloom
+
+    const bloomPass = new THREE.UnrealBloomPass();
+    bloomPass.strength = 3.0;
+    bloomPass.radius = 1.0;
+    bloomPass.threshold = 0.1;
+    Graph.postProcessingComposer().addPass(bloomPass);
+
+    const min_bloomPass = new THREE.UnrealBloomPass();
+    min_bloomPass.strength = 0.2;
+    min_bloomPass.radius = 0.1;
+    min_bloomPass.threshold = 0.1;
+    //Graph.postProcessingComposer().addPass(min_bloomPass);
+
+
+
+    //setting the dither pixel size adaptable to different devices
+    var ditherPixelScale = 4.0 * pixRatio;
+    console.log("pixRatio ->", pixRatio);
+
+    //Dither
+    var effectDither = new THREE.ShaderPass( THREE.MonocellShader );
+    effectDither.uniforms[ 'grayScale' ].value = 0;
+    effectDither.uniforms[ 'pixelScale' ].value = ditherPixelScale;
+    Graph.postProcessingComposer().addPass(effectDither);
+
+
+
+    function isInactiveLink(link) {
+      //console.log(link.state)
+      if (parseInt(link.state)  < 0) {
+        return true;
+      } else {
+        return false
+      }
+    }
+
+    linkForce.strength(link => {
+      if (parseInt(link.state) > 0) {
+      return 0 //Animation
+    } else if (parseInt(link.state) < 0) {
+      return 0.0001 //Broken Links
+    } else { return 0.1} //MonoGrid
+    })
+    linkForce.distance(link => link.value)
+    //linkForce.strength(link => console.log())
+
+
+    //Degeneration
+    var link_index = 0;
+    var assemble = false;
+    var delay = false;
+    var initial_delay = false;
+
+    //delay degeneration
+
+    setTimeout(() => {
+      if (!(degeneration_type == "none")) {
+        initial_delay = true;
+        console.log("degeneration started..")
+      }
+    }, 5000);
+
+    //console.log("nodes to cycle through:", dnodes.length)
+
+    setInterval(() => {
+    if (!(degeneration_type == "none") && initial_delay == true) {
+      if (assemble == false && link_index < dnodes.length) {
+      var e = dnodes[link_index]
+        gData.links.splice(gData.links.indexOf(e), 1)
+        link_index++;
+        //console.log("disassembling")
+        //Graph.linkThreeObject(link => {})
+        //  .linkPositionUpdate((line, { start, end }) => {
+        //const linePos = line.geometry.getAttribute('position');
+        //linePos.needsUpdate = true;
+        //});
+    } else if (link_index == dnodes.length || link_index == -1) {
+        if (delay == false) {
+          delay = setTimeout(() => {
+            assemble = !assemble;
+            if (assemble) {
+              link_index--;
+            } else {
+              link_index++;
+            }
+            delay = false
+          }, 5000)
+        }
+
+
+      } else if (assemble == true) {
+        //console.log("assembling")
+        gData.links.push(dnodes[link_index])
+        link_index--;
+        //Graph.linkThreeObject(link => {})
+        //  .linkPositionUpdate((line, { start, end }) => {
+        //const linePos = line.geometry.getAttribute('position');
+        //linePos.needsUpdate = true;
+        //});
+      }
+
+    }
+
+}, 50);
+
+
+
+
+    //function connected_filter(nodes) {node}
+    //console.log(gData.nodes)
+
+
+    const amplitude = 2.0;
+    const frame_rate = 100;
+    const scale_time_step = Math.PI / frame_rate;
+
+    function update_scale(node, index){
+      var ascale = (1 == (-1)**node.connectivity) ? nscale : 1-nscale
+      node.__threeObj.scale.set(ascale,ascale,ascale);
+    };
+
+
+    let npulse = 0;
+    let snap = true;
+    if (node_mode == 3) {
+      setInterval(() => {
+        nscale = 0.5 + Math.sin(npulse)/2;
+        gData.nodes.forEach(update_scale);
+        npulse += scale_time_step;
+      }, 50);
+    };
+
+    let xpulse = 0;
+    setInterval(() => {
+    //var selected_len = gData['unique_edge_lengths'][0]
+    //var selected_links = Object.keys(gData['links']).
+    //filter((key) => key.l_len == selected_len).
+    //reduce((cur, key) => { return Object.assign(cur, { [key]: obj[key] })}, {});
+
+    //This zooms to fit till the first expansion then stops being activated.
+    if (xpulse > Math.PI/2 && snap) {
+      //console.log("ZoomExtents")
+      snap = false;
+      Graph.zoomToFit(2000);
+    }
+
+    //Replace 0 with %[0,1,1,1,1][gData['unique_edge_lengths'].indexOf(link.value)] with [0,1,1,1,1] being the length of the unique lengths with some pattern
+    var link_cml_edge_dist = 0
+
+    linkForce.distance(link => {
+      var unique_edge_index = gData['unique_edge_lengths'].indexOf(link.value); //sumtimes is -1
+      //if (gData['unique_edge_lengths'].indexOf(link.value) == -1) {
+      //  console.log(link.value,gData['unique_edge_lengths'])
+      //}
+      var animation_map = [Math.cos(xpulse), Math.sin(xpulse), 0]
+      //console.log(unique_edge_index, modulation_pattern, animation_map)
+      var this_edge_dist = (parseInt(link.state) >= 0 ? 1:0) *link.value* amplitude * animation_map[modulation_pattern[unique_edge_index]] + link.value; //* amplitude * animation_map[modulation_pattern[unique_edge_index]]
+      link_cml_edge_dist += this_edge_dist;
+      return this_edge_dist; //* (link.source.connectivity+link.target.connectivity)/2
+    })
+
+    Graph.d3ReheatSimulation();
+
+
+
+
+    xpulse += scale_time_step
+    bloomPass.strength = allel_18 * (1 - link_cml_edge_dist/100000);
+
+
+  }, frame_rate);
+
+  //Graph.onEngineStop(() => Graph.d3ReheatSimulation());
+
+
+    //Connection - Animate link layers
+
+    let seq = 0;
+    setInterval(() => {
+      if (dynamic_track) {
+        Graph.zoomToFit(1000, 0);
+      }
+      //console.log("SEQ: ", seq % layers.length)
+
+      linkForce.strength(link => {
+        if (parseInt(link.state) == 0) {
+          return 0.1
+        } else if (seq % layers.length == parseInt(link.state)) {
+          return 0.1
+        } else {
+          return 0.0001
+        }
+      })
+      seq ++
+
+    }, 3000);
+
+
+    // Set the camera position at the beginning
+    setTimeout(() => {
+      Graph.cameraPosition({ z: 5000 }); //z parameter determines the camera distance
+    }, 0)
+
+
+  }
+
+    window.addEventListener('resize', () => {
+         Graph.height(window.innerHeight);
+         Graph.width(window.innerWidth);
+         //Luka added these below
+         var winWidth = window.innerWidth;
+         var winHeight =  window.innerHeight;
+         var pixRatio = window.devicePixelRatio;
+         //effectPixelate.uniforms.uResolution.value.set(winWidth*pixRatio, winHeight*pixRatio);
+    });
+
+    const handler = (e) => {
+        chromoplasm();
+    };
+
+    const recorder = (e) => {
+      const canvas = document.querySelector("canvas");
+      const recenterBtn = document.getElementById('recenter');
+      const recordBtn = document.getElementById('gif');
+      let recording = false;
+      let mediaRecorder;
+      let recordedChunks;
+
+      recenterBtn.addEventListener("click", () => {
+        Graph.zoomToFit(400);
+      });
+
+      recenterBtn.addEventListener("dblclick", () => {
+        dynamic_track = !dynamic_track
+        if (dynamic_track) {
+          recenterBtn.textContent = ">><<"
+        } else {
+          recenterBtn.textContent = "><"
+        }
+      });
+
+      recordBtn.addEventListener("click", () => {
+        recording = !recording;
+          if(recording){
+                  recordBtn.textContent = "x";
+                  const stream = canvas.captureStream(25);
+                  mediaRecorder = new MediaRecorder(stream, {
+                      mimeType: 'video/webm;codecs=vp9',
+                      ignoreMutedMedia: true
+                  });
+                  recordedChunks = [];
+                  mediaRecorder.ondataavailable = e => {
+                      if(e.data.size > 0){
+                          recordedChunks.push(e.data);
+                      }
+                  };
+                  mediaRecorder.start();
+              } else {
+                  recordBtn.textContent = "o_o"
+                  mediaRecorder.stop();
+                  setTimeout(() => {
+                      const blob = new Blob(recordedChunks, {
+                          type: "video/webm"
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = variant_name + ".webm";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                  },0);
+              }
+      });
+    };
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+      handler();
+      recorder();
+    });
+
+
+    //Inactivty hide buttons
+    var interval = 1;
+
+    setInterval(function(){
+       if(interval == 5){
+           /* if intervall reaches 5 the user is inactive hide element/s */
+
+           document.getElementById('recenter').style.visibility = "hidden";;
+           document.getElementById('gif').style.visibility = "hidden";;
+           interval = 1;
+       }
+       interval = interval+1;
+    },1000);
+
+      document.onmousemove = function() {
+        /* on mousemove or keypressed show the hidden input (user active) */
+        document.getElementById('recenter').style.visibility = "visible";;
+        document.getElementById('gif').style.visibility = "visible";;
+        interval = 1;
+    };
+
+
+
+
+  </script>
+</body>
