@@ -24,6 +24,7 @@ function setup() {
   saveButton.style('font-family', 'courier, serif');
   saveButton.style('cursor', 'pointer');
   saveButton.mousePressed(saveFile);
+  saveButton.touchStarted(saveFile);
 
   // Creating the clear screen button
   clearButton = createButton('→ CLEAR ←');
@@ -32,6 +33,7 @@ function setup() {
   clearButton.style('font-family', 'courier, serif');
   clearButton.style('cursor', 'pointer');
   clearButton.mousePressed(clearScreen);
+  clearButton.touchStarted(clearScreen);
 
   // Creating the button for Full Screen
   fullscreenButton = createButton('→ FULLSCREEN ←');
@@ -40,6 +42,7 @@ function setup() {
   fullscreenButton.style('font-family', 'courier, serif');
   fullscreenButton.style('cursor', 'pointer');
   fullscreenButton.mousePressed(screenFull);
+  fullscreenButton.touchStarted(screenFull);
   
   // Setting up the slider for the thickness of the brush
   brushSizeSlider = createSlider(1, 20, 1, 0.1);
