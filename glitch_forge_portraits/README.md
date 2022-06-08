@@ -12,3 +12,5 @@
 </pre>
 
 WIP by {protocell:labs} and jrdsctt for Glitch Forge, 2022
+
+This p5.js code will generate and download a single random animated gif (1000 x 1000 pix, 5 frames).

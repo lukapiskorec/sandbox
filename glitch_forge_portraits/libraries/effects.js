@@ -1,5 +1,5 @@
 // Collection of functions and effects for image manipulation and glitching
-// collected by @LukaPiskorec
+// by @LukaPiskorec
 
 
 
@@ -27,12 +27,519 @@ function setupGif() {
 
 
 
+// EFFECT STACKS
+
+// effect stack 0 -> Monochrome dither
+function applyMonochromeDither(img) {
+
+  setBrightness(img, new_brightness);
+  grayscale(img, contrast);
+
+  img_2 = img.get(); // copy image pixels
+  img_3 = img.get(); // copy image pixels
+
+  // 1. Full image
+  blendMode(BLEND); // make sure to set blendMode back to default one just in case
+  noTint();
+  img.resize(img.width / pix_scaling, 0);
+  makeDithered(img, nr_of_levels, dither_params_1);
+  img.resizeNN(img.width * pix_scaling, 0);
+  image(img, image_border[0]/2, image_border[1]/2);
+
+  // 2. Bright part of the image
+  blendMode(BLEND);
+  brightnessMask(img_2, mask_contrast, light_treshold, invert_mask);
+  makeDithered(img_2, nr_of_levels, dither_params_2);
+  image(img_2, image_border[0]/2 + layer_shift, image_border[1]/2 + layer_shift);
+
+  // 3. Dark part of the image
+  blendMode(ADD);
+  img_3.resize(img_3.width / pix_scaling_dark, 0);
+  brightnessMask(img_3, mask_contrast, dark_treshold, !invert_mask);
+  makeDithered(img_3, nr_of_levels, dither_params_3);
+  tint(tint_palette[0], tint_palette[1], tint_palette[2]);
+  img_3.resizeNN(img_3.width * pix_scaling_dark, 0);
+  image(img_3, image_border[0]/2 + layer_shift, image_border[1]/2 + layer_shift);
+
+  blendMode(BLEND);
+  noTint();
+}
+
+
+// effect stack 1 -> Tinted dither
+function applyTintedDither(img) {
+
+  setBrightness(img, new_brightness);
+  img_2 = img.get(); // copy image pixels
+
+  // 1. Full image
+  blendMode(BLEND);
+  setContrast(img, contrast);
+  img.resize(img.width / pix_scaling, 0);
+  makeDithered(img, nr_of_levels, dither_params_1);
+  tint(tint_palette[0], tint_palette[1], tint_palette[2]);
+  img.resizeNN(img.width * pix_scaling, 0);
+  image(img, image_border[0]/2, image_border[1]/2);
+
+  // 2. Bright part of the image
+  blendMode(ADD);
+  noTint();
+  grayscale(img_2, contrast);
+  img_2.resize(img_2.width / (pix_scaling / 2), 0);
+  brightnessMask(img_2, mask_contrast, light_treshold, invert_mask);
+  makeDithered(img_2, nr_of_levels, dither_params_2);
+  img_2.resizeNN(img_2.width * pix_scaling / 2, 0);
+  image(img_2, image_border[0]/2 + layer_shift, image_border[1]/2 + layer_shift);
+
+  blendMode(BLEND);
+  noTint();
+}
+
+
+// effect stack 2 -> Color dither + pixel sorting
+function applyDitherSorting(img) {
+
+  setBrightness(img, new_brightness);
+  img_2 = img.get(); // copy image pixels
+
+  // 1. Full image
+  blendMode(BLEND);
+  setContrast(img, contrast);
+  img.resize(img.width / pix_scaling, 0);
+  makeDithered(img, nr_of_levels, dither_params_1);
+
+  switch(sorting_order) {
+    case 0:
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 1:
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 2:
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 3:
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    default:
+      break;
+  }
+
+  makeDithered(img, nr_of_levels, dither_params_1);
+
+  switch(tinting_mode) {
+    case 1:
+      tint_palette_key = 'magenta';
+      tint_palette = three_bit_palette[tint_palette_key];
+      tint(tint_palette[0], tint_palette[1], tint_palette[2]);
+      break;
+    case 2:
+      tint_palette_key = 'cyan';
+      tint_palette = three_bit_palette[tint_palette_key];
+      tint(tint_palette[0], tint_palette[1], tint_palette[2]);
+      break;
+    default:
+      // no tinting
+      break;
+  }
+
+  img.resizeNN(img.width * pix_scaling, 0);
+  image(img, image_border[0]/2, image_border[1]/2);
+
+  // 2. Bright part of the image
+  blendMode(ADD);
+  noTint();
+  grayscale(img_2, contrast);
+  img_2.resize(img_2.width / pix_scaling, 0);
+  brightnessMask(img_2, mask_contrast, light_treshold, invert_mask);
+  makeDithered(img_2, nr_of_levels, dither_params_2);
+  img_2.resizeNN(img_2.width * pix_scaling, 0);
+  image(img_2, image_border[0]/2 + layer_shift, image_border[1]/2 + layer_shift);
+
+  blendMode(BLEND);
+  noTint();
+}
+
+
+// effect stack 3 -> Pixel sorting + color dither
+function applySortingDither(img) {
+
+  setBrightness(img, new_brightness);
+  img_2 = img.get(); // copy image pixels
+
+  // 1. Full image
+  blendMode(BLEND);
+  setContrast(img, contrast);
+  img.resize(img.width / pix_scaling, 0);
+
+  switch(sorting_order) {
+    case 0:
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 1:
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 2:
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 3:
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    default:
+      break;
+  }
+
+  makeDithered(img, nr_of_levels, dither_params_1);
+
+  switch(tinting_mode) {
+    case 1:
+      tint_palette_key = 'magenta';
+      tint_palette = three_bit_palette[tint_palette_key];
+      tint(tint_palette[0], tint_palette[1], tint_palette[2]);
+      break;
+    case 2:
+      tint_palette_key = 'cyan';
+      tint_palette = three_bit_palette[tint_palette_key];
+      tint(tint_palette[0], tint_palette[1], tint_palette[2]);
+      break;
+    default:
+      // no tinting
+      break;
+  }
+
+  img.resizeNN(img.width * pix_scaling, 0);
+  image(img, image_border[0]/2, image_border[1]/2);
+
+  // 2. Bright part of the image
+  blendMode(ADD);
+  noTint();
+  grayscale(img_2, contrast);
+  img_2.resize(img_2.width / pix_scaling, 0);
+  brightnessMask(img_2, mask_contrast, light_treshold, invert_mask);
+  makeDithered(img_2, nr_of_levels, dither_params_2);
+  img_2.resizeNN(img_2.width * pix_scaling, 0);
+  image(img_2, image_border[0]/2 + layer_shift, image_border[1]/2 + layer_shift);
+
+  blendMode(BLEND);
+  noTint();
+}
+
+
+// effect stack 4 -> Abstract dither
+function applyAbstractDither(img) {
+
+  setBrightness(img, new_brightness);
+
+  // 1. Full image
+  blendMode(BLEND);
+  grayscale(img, contrast);
+  img.resize(img.width / pix_scaling, 0);
+  makeDithered(img, nr_of_levels, dither_params_1);
+  img.resizeNN(img.width * pix_scaling / 2.0, 0); // we resize back only half way
+
+  // here we had to take out pixelSortRow option as it didn't produce nice results
+  switch(sorting_order) {
+    case 0:
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 1:
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    case 2:
+      pixelSortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+      break;
+    default:
+      break;
+  }
+
+  makeDithered(img, nr_of_levels, dither_params_1);
+  img.resizeNN(img.width * 2.0, 0); // we resize back double to get to the size of the original input image
+  image(img, image_border[0]/2, image_border[1]/2);
+
+  blendMode(BLEND);
+  noTint();
+}
+
+
+// MAKE GIF ANIMATION
+
+// create 5 frame animation using monochrome dither effect stack
+function animateMonochromeDither(img) {
+
+  setupGif(); // setup gif
+
+  // make source image copies
+
+  frame_1 = img.get();
+  frame_2 = img.get();
+  frame_3 = img.get();
+  frame_4 = img.get();
+  frame_5 = img.get();
+
+  // apply effects to individual frames and add them to the gif animation
+
+  background(0);
+  applyMonochromeDither(frame_1);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[0] * delta_factor;
+  new_brightness += brightness_delta[0] * delta_factor;
+
+  background(0);
+  applyMonochromeDither(frame_2);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[1] * delta_factor;
+  new_brightness += brightness_delta[1] * delta_factor;
+
+  background(0);
+  applyMonochromeDither(frame_3);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[2] * delta_factor;
+  new_brightness += brightness_delta[2] * delta_factor;
+
+  background(0);
+  applyMonochromeDither(frame_4);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[3] * delta_factor;
+  new_brightness += brightness_delta[3] * delta_factor;
+
+  background(0);
+  applyMonochromeDither(frame_5);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  gif.render(); // render gif when done
+
+}
+
+
+// create 5 frame animation using tinted dither effect stack
+function animateTintedDither(img) {
+
+  setupGif(); // setup gif
+
+  // make source image copies
+
+  frame_1 = img.get();
+  frame_2 = img.get();
+  frame_3 = img.get();
+  frame_4 = img.get();
+  frame_5 = img.get();
+
+  // apply effects to individual frames and add them to the gif animation
+
+  background(0);
+  applyTintedDither(frame_1);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[0] * delta_factor;
+  new_brightness += brightness_delta[0] * delta_factor;
+
+  background(0);
+  applyTintedDither(frame_2);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[1] * delta_factor;
+  new_brightness += brightness_delta[1] * delta_factor;
+
+  background(0);
+  applyTintedDither(frame_3);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[2] * delta_factor;
+  new_brightness += brightness_delta[2] * delta_factor;
+
+  background(0);
+  applyTintedDither(frame_4);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[3] * delta_factor;
+  new_brightness += brightness_delta[3] * delta_factor;
+
+  background(0);
+  applyTintedDither(frame_5);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  gif.render(); // render gif when done
+
+}
+
+
+
+// create 5 frame animation using color dither + pixel sorting effect stack
+function animateDitherSorting(img) {
+
+  setupGif(); // setup gif
+
+  // make source image copies
+
+  frame_1 = img.get();
+  frame_2 = img.get();
+  frame_3 = img.get();
+  frame_4 = img.get();
+  frame_5 = img.get();
+
+  // apply effects to individual frames and add them to the gif animation
+
+  background(0);
+  applyDitherSorting(frame_1);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[0] * delta_factor;
+  new_brightness += brightness_delta[0] * delta_factor;
+
+  background(0);
+  applyDitherSorting(frame_2);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[1] * delta_factor;
+  new_brightness += brightness_delta[1] * delta_factor;
+
+  background(0);
+  applyDitherSorting(frame_3);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[2] * delta_factor;
+  new_brightness += brightness_delta[2] * delta_factor;
+
+  background(0);
+  applyDitherSorting(frame_4);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[3] * delta_factor;
+  new_brightness += brightness_delta[3] * delta_factor;
+
+  background(0);
+  applyDitherSorting(frame_5);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  gif.render(); // render gif when done
+
+}
+
+
+
+// create 5 frame animation using pixel sorting + color dither effect stack
+function animateSortingDither(img) {
+
+  setupGif(); // setup gif
+
+  // make source image copies
+
+  frame_1 = img.get();
+  frame_2 = img.get();
+  frame_3 = img.get();
+  frame_4 = img.get();
+  frame_5 = img.get();
+
+  // apply effects to individual frames and add them to the gif animation
+
+  background(0);
+  applySortingDither(frame_1);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[0] * delta_factor;
+  new_brightness += brightness_delta[0] * delta_factor;
+
+  background(0);
+  applySortingDither(frame_2);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[1] * delta_factor;
+  new_brightness += brightness_delta[1] * delta_factor;
+
+  background(0);
+  applySortingDither(frame_3);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[2] * delta_factor;
+  new_brightness += brightness_delta[2] * delta_factor;
+
+  background(0);
+  applySortingDither(frame_4);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[3] * delta_factor;
+  new_brightness += brightness_delta[3] * delta_factor;
+
+  background(0);
+  applySortingDither(frame_5);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  gif.render(); // render gif when done
+
+}
+
+
+
+
+// create 5 frame animation using abstract dither effect stack
+function animateAbstractDither(img) {
+
+  setupGif(); // setup gif
+
+  // make source image copies
+
+  frame_1 = img.get();
+  frame_2 = img.get();
+  frame_3 = img.get();
+  frame_4 = img.get();
+  frame_5 = img.get();
+
+  // apply effects to individual frames and add them to the gif animation
+
+  background(0);
+  applyAbstractDither(frame_1);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[0] * delta_factor;
+  new_brightness += brightness_delta[0] * delta_factor;
+
+  background(0);
+  applyAbstractDither(frame_2);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[1] * delta_factor;
+  new_brightness += brightness_delta[1] * delta_factor;
+
+  background(0);
+  applyAbstractDither(frame_3);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[2] * delta_factor;
+  new_brightness += brightness_delta[2] * delta_factor;
+
+  background(0);
+  applyAbstractDither(frame_4);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  contrast += contrast_delta[3] * delta_factor;
+  new_brightness += brightness_delta[3] * delta_factor;
+
+  background(0);
+  applyAbstractDither(frame_5);
+  gif.addFrame(canvas.elt, {delay: frame_duration, copy: true }); // add frame to gif with canvas.elt which calls underlying HTML element
+
+  gif.render(); // render gif when done
+
+}
+
+
+
+
 // ASDFPixelSort_Color - rewritten from Java to JavaScript by @lukapiskorec
-//original Java code downloaded from here
+// original Java code downloaded from here
 //https://github.com/shmam/ASDFPixelSort_Color
 
-function pixelSortColor(img) {
-
+function pixelSortColor(img, sorting_mode, sorting_type, color_noise_density = 5, color_noise_bias = [1,1,1], color_noise_variation = 1000) {
   // reset row and column for each image!
   row = 0;
   column = 0;
@@ -40,28 +547,57 @@ function pixelSortColor(img) {
   img.loadPixels();
 
   while(column < img.width-1) {
-    sortColumn(img);
+    sortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
     column++;
   }
 
   while(row < img.height-1) {
-    sortRow(img);
+    sortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
     row++;
   }
 
   img.updatePixels();
+}
 
+
+function pixelSortColumn(img, sorting_mode, sorting_type, color_noise_density = 5, color_noise_bias = [1,1,1], color_noise_variation = 1000) {
+  // reset column for each image!
+  column = 0;
+
+  img.loadPixels();
+
+  while(column < img.width-1) {
+    sortColumn(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+    column++;
+  }
+
+  img.updatePixels();
+}
+
+
+function pixelSortRow(img, sorting_mode, sorting_type, color_noise_density = 5, color_noise_bias = [1,1,1], color_noise_variation = 1000) {
+  // reset row for each image!
+  row = 0;
+
+  img.loadPixels();
+
+  while(row < img.height-1) {
+    sortRow(img, sorting_mode, sorting_type, color_noise_density, color_noise_bias, color_noise_variation);
+    row++;
+  }
+
+  img.updatePixels();
 }
 
 
 // used for pixel sorting
-function sortRow(img) {
+function sortRow(img, sorting_mode, sorting_type, color_noise_density = 5, color_noise_bias = [1,1,1], color_noise_variation = 1000) {
   let x = 0;
   let y = row;
   let xend = 0;
 
   while(xend < img.width-1) {
-    switch(mode) {
+    switch(sorting_mode) {
       case 0:
         x = getFirstNotBlackX(img, x, y);
         xend = getNextBlackX(img, x, y);
@@ -86,11 +622,12 @@ function sortRow(img) {
     unsorted = [];
     sorted = [];
 
-    randomColor = color(random(255), random(255), random(255), 255);
+    //randomColor = color(random(255), random(255), random(255), 255);
+    randomColor = color(random(255)*color_noise_bias[0], random(255)*color_noise_bias[1], random(255)*color_noise_bias[2], 255);
     d = 0;
 
-    if(random(100) < 5 ){
-         d = random(1000);
+    if(random(100) < color_noise_density){
+         d = random(color_noise_variation);
     }
 
     for(let i=0; i<sortLength; i= i+1) {
@@ -101,22 +638,33 @@ function sortRow(img) {
           d--;
       }
 
-      // chaotic sorting
-      unsorted[i] = getColorAtIndex(img, x + i, y);
-      // proper sorting
-      //colorHex = getColorAtIndex(img, x + i, y);
-      //unsorted[i] = rgbToHex(red(colorHex), green(colorHex), blue(colorHex));
-
+      switch(sorting_type) {
+        case 0: // chaotic sorting
+          unsorted[i] = getColorAtIndex(img, x + i, y);
+          break;
+        case 1: // proper sorting
+          colorHex = getColorAtIndex(img, x + i, y);
+          unsorted[i] = rgbToHex(red(colorHex), green(colorHex), blue(colorHex));
+          break;
+        default:
+          break;
+      }
     }
 
     sorted = unsorted.sort();
 
     for(let i=0; i<sortLength; i=i+1) {
-      // chaotic sorting
-      setColorAtIndex(img, x + i, y, sorted[i]);
-      // proper sorting
-      //pixelColor = hexToRgb(unsorted[i]);
-      //setColorAtIndex(img, x + i, y, pixelColor);
+      switch(sorting_type) {
+        case 0: // chaotic sorting
+          setColorAtIndex(img, x + i, y, sorted[i]);
+          break;
+        case 1: // proper sorting
+          pixelColor = hexToRgb(unsorted[i]);
+          setColorAtIndex(img, x + i, y, pixelColor);
+          break;
+        default:
+          break;
+      }
     }
 
     x = xend+1;
@@ -125,13 +673,13 @@ function sortRow(img) {
 
 
 // used for pixel sorting
-function sortColumn(img) {
+function sortColumn(img, sorting_mode, sorting_type, color_noise_density = 5, color_noise_bias = [1,1,1], color_noise_variation = 1000) {
   let x = column;
   let y = 0;
   let yend = 0;
 
   while(yend < img.height-1) {
-    switch(mode) {
+    switch(sorting_mode) {
       case 0:
         y = getFirstNotBlackY(img, x, y);
         yend = getNextBlackY(img, x, y);
@@ -156,11 +704,12 @@ function sortColumn(img) {
     unsorted = [];
     sorted = [];
 
-    randomColor = color(random(255), random(255), random(255), 255);
+    //randomColor = color(random(255), random(255), random(255), 255);
+    randomColor = color(random(255)*color_noise_bias[0], random(255)*color_noise_bias[1], random(255)*color_noise_bias[2], 255);
     d = 0;
 
-    if(random(100) < 5 ){
-         d = random(1000);
+    if(random(100) < color_noise_density){
+         d = random(color_noise_variation);
     }
 
     for(let i=0; i<sortLength; i++) {
@@ -170,21 +719,34 @@ function sortColumn(img) {
           setColorAtIndex(img, x + i, y, lerpColor(pixelColor, randomColor, mixPercentage));
           d--;
       }
-      // chaotic sorting
-      unsorted[i] = getColorAtIndex(img, x + i, y);
-      // proper sorting
-      //colorHex = getColorAtIndex(img, x + i, y);
-      //unsorted[i] = rgbToHex(red(colorHex), green(colorHex), blue(colorHex));
+
+      switch(sorting_type) {
+        case 0: // chaotic sorting
+          unsorted[i] = getColorAtIndex(img, x + i, y);
+          break;
+        case 1: // proper sorting
+          colorHex = getColorAtIndex(img, x + i, y);
+          unsorted[i] = rgbToHex(red(colorHex), green(colorHex), blue(colorHex));
+          break;
+        default:
+          break;
+      }
     }
 
     sorted = unsorted.sort();
 
     for(let i=0; i<sortLength; i++) {
-      // chaotic sorting
-      setColorAtIndex(img, x, y + i, sorted[i]);
-      // proper sorting
-      //pixelColor = hexToRgb(unsorted[i]);
-      //setColorAtIndex(img, x, y + i, pixelColor);
+      switch(sorting_type) {
+        case 0: // chaotic sorting
+          setColorAtIndex(img, x, y + i, sorted[i]);
+          break;
+        case 1: // proper sorting
+          pixelColor = hexToRgb(unsorted[i]);
+          setColorAtIndex(img, x, y + i, pixelColor);
+          break;
+        default:
+          break;
+      }
     }
 
     y = yend+1;
@@ -355,16 +917,19 @@ function makeDithered(img, steps, dither_params) {
       let oldR = red(clr);
       let oldG = green(clr);
       let oldB = blue(clr);
+      let oldA = alpha(clr);
       let newR = closestStep(255, steps, oldR);
       let newG = closestStep(255, steps, oldG);
       let newB = closestStep(255, steps, oldB);
-      let newClr = color(newR, newG, newB);
+      let newA = closestStep(255, steps, oldA);
+      let newClr = color(newR, newG, newB, newA);
       setColorAtIndex(img, x, y, newClr);
       let errR = oldR - newR;
       let errG = oldG - newG;
       let errB = oldB - newB;
+      let errA = oldA - newA;
 
-      distributeError_params(img, x, y, errR, errG, errB, dither_params);
+      distributeError_params(img, x, y, errR, errG, errB, errA, dither_params);
 
     }
   }
@@ -373,151 +938,44 @@ function makeDithered(img, steps, dither_params) {
 
 
 //Floyd-Steinberg algorithm achieves dithering using error diffusion (formula from Wikipedia)
-function distributeError(img, x, y, errR, errG, errB) {
-  addError(img, 7 / 16.0, x + 1, y, errR, errG, errB);
-  addError(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
-  addError(img, 5 / 16.0, x, y + 1, errR, errG, errB);
-  addError(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
+function distributeError(img, x, y, errR, errG, errB, errA) {
+  addError(img, 7 / 16.0, x + 1, y, errR, errG, errB, errA);
+  addError(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB, errA);
+  addError(img, 5 / 16.0, x, y + 1, errR, errG, errB, errA);
+  addError(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB, errA);
 }
 
 
 //Floyd-Steinberg dithering algorithm with varable parameters
-function distributeError_params(img, x, y, errR, errG, errB, params) {
-  addError(img, params[0], x + 1, y, errR, errG, errB);
-  addError(img, params[1], x - 1, y + 1, errR, errG, errB);
-  addError(img, params[2], x, y + 1, errR, errG, errB);
-  addError(img, params[3], x + 1, y + 1, errR, errG, errB);
+function distributeError_params(img, x, y, errR, errG, errB, errA, params) {
+  addError(img, params[0], x + 1, y, errR, errG, errB, errA);
+  addError(img, params[1], x - 1, y + 1, errR, errG, errB, errA);
+  addError(img, params[2], x, y + 1, errR, errG, errB, errA);
+  addError(img, params[3], x + 1, y + 1, errR, errG, errB, errA);
 }
-
 
 
 //Floyd-Steinberg algorithm pushes (adds) the residual quantization error
 //of a pixel onto its neighboring pixels
-function addError(img, factor, x, y, errR, errG, errB) {
+function addError(img, factor, x, y, errR, errG, errB, errA) {
   if (x < 0 || x >= img.width || y < 0 || y >= img.height) return;
   let clr = getColorAtIndex(img, x, y);
   let r = red(clr);
   let g = green(clr);
   let b = blue(clr);
+  let a = alpha(clr);
   clr.setRed(r + errR * factor);
   clr.setGreen(g + errG * factor);
   clr.setBlue(b + errB * factor);
+  clr.setAlpha(a + errA * factor);
   setColorAtIndex(img, x, y, clr);
 }
-
 
 
 //experiment with different Floyd-Steinberg dithering variations using this online tool:
 //https://kgjenkins.github.io/dither-dream/
 //repository link:
 //https://github.com/kgjenkins/dither-dream
-
-
-
-//these Floyd-Steinberg dithering functions below were taken from
-//"CHX-1" BY THOMAS NOYA | GENERATIVE PROJECT FOR FX(HASH) | MAR 2022
-//IG: @TSNOYA | TT: @O2HT | THOMASNOYA.COM | linktr.ee/tsnoya
-
-function distributeError_0(img, x, y, errR, errG, errB) {
-    addError_0(img, 7 / 16.0, x + 1, y, errR, errG, errB);
-    addError_0(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_0(img, 5 / 16.0, x, y + 1, errR, errG, errB);
-    addError_0(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function distributeError_1(img, x, y, errR, errG, errB) {
-    addError_0(img, 7 / 16.0, x + 1, y, errR, errG, errB);
-    addError_0(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_0(img, 5 >> 16.0, x, y + 1, errR, errG, errB);
-    addError_0(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function distributeError_2(img, x, y, errR, errG, errB) {
-    addError_0(img, 7 / 16.0, x + 1, y, errR, errG, errB);
-    addError_0(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_0(img, 5 >> 16.0, x, y + 1, errR, errG, errB);
-    addError_0(img, 1 % 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function distributeError_3(img, x, y, errR, errG, errB) {
-    addError_3(img, 7 / 16.0, x + 1, y, errR, errG, errB);
-    addError_3(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_3(img, 5 / 16.0, x, y + 1, errR, errG, errB);
-    addError_3(img, 1 >> 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function distributeError_4(img, x, y, errR, errG, errB) {
-    addError_0(img, 7 - 16.0, x + 1, y, errR, errG, errB);
-    addError_0(img, 1 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_0(img, 1 / 16.0, x, y + 1, errR, errG, errB);
-    addError_0(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function distributeError_5(img, x, y, errR, errG, errB) {
-    addError_5(img, 7 - 16.0, x + 1, y, errR, errG, errB);
-    addError_5(img, 1 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_5(img, 1 / 16.0, x, y + 1, errR, errG, errB);
-    addError_5(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function distributeError_6(img, x, y, errR, errG, errB) {
-    addError_4(img, 7 / 16.0, x + 1, y, errR, errG, errB);
-    addError_4(img, 3 / 16.0, x - 1, y + 1, errR, errG, errB);
-    addError_4(img, 5 >> 16.0, x, y + 1, errR, errG, errB);
-    addError_4(img, 1 / 16.0, x + 1, y + 1, errR, errG, errB);
-}
-
-function addError_0(img, factor, x, y, errR, errG, errB) {
-    if (x < 0 || x >= img.width || y < 0 || y >= img.height)
-        return;
-    let clr = getColorAtIndex(img, x, y);
-    let r = red(clr);
-    let g = green(clr);
-    let b = blue(clr);
-    clr.setRed(r + errR * factor);
-    clr.setGreen(g + errG * factor);
-    clr.setBlue(b + errB * factor);
-    setColorAtIndex(img, x, y, clr);
-}
-
-function addError_3(img, factor, x, y, errR, errG, errB) {
-    if (x < 0 || x >= img.width || y < 0 || y >= img.height)
-        return;
-    let clr = getColorAtIndex(img, x, y);
-    let r = red(clr);
-    let g = green(clr);
-    let b = blue(clr);
-    clr.setRed(r + errR - factor);
-    clr.setGreen(g + errG * factor);
-    clr.setBlue(b + errB - factor);
-    setColorAtIndex(img, x, y, clr);
-}
-
-function addError_4(img, factor, x, y, errR, errG, errB) {
-    if (x < 0 || x >= img.width || y < 0 || y >= img.height)
-        return;
-    let clr = getColorAtIndex(img, x, y);
-    let r = red(clr);
-    let g = green(clr);
-    let b = blue(clr);
-    clr.setRed(r + errR - factor);
-    clr.setGreen(g + errG - factor);
-    clr.setBlue(b + errB - factor);
-    setColorAtIndex(img, x, y, clr);
-}
-
-function addError_5(img, factor, x, y, errR, errG, errB) {
-    if (x < 0 || x >= img.width || y < 0 || y >= img.height)
-        return;
-    let clr = getColorAtIndex(img, x, y);
-    let r = red(clr);
-    let g = green(clr);
-    let b = blue(clr);
-    clr.setRed(r + errR / factor);
-    clr.setGreen(g + errG / factor);
-    clr.setBlue(b + errB * factor);
-    setColorAtIndex(img, x, y, clr);
-}
 
 
 
@@ -546,21 +1004,45 @@ function hexToRgb(hex) {
     return color(r, g, b);
 }
 
-
-//return random integer from min to max number
+// return random integer from min to max number
 function randInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return Math.floor(random(min, max));
+}
+
+// return a random key from JSON dictionary
+function getRandomKey(json_dict){
+    let obj_keys = Object.keys(json_dict);
+    let ran_key = obj_keys[int(random(obj_keys.length))];
+    return ran_key;
+}
+
+// return random element from a list with set weights in form:
+// data = [ ["a", 50], ["b", 25], ["c", 25] ]; numbers are not strict probabilities so don't have to add up to 100
+function weightedChoice(data){
+  let total = 0;
+  for (let i = 0; i < data.length; ++i) {
+      total += data[i][1];
+  }
+  const threshold = random(total);
+  total = 0;
+  for (let i = 0; i < data.length - 1; ++i) {
+      total += data[i][1];
+      if (total >= threshold) {
+          return data[i][0];
+      }
+  }
+  return data[data.length - 1][0];
 }
 
 
-//returns an index location (i) for pixel coordinates (x,y)
+// returns an index location (i) for pixel coordinates (x,y)
 function imageIndex(img, x, y) {
   return 4 * (x + y * img.width);
 }
 
-//returns color of a pixel at coordinates (x,y)
+// returns color of a pixel at coordinates (x,y)
 function getColorAtIndex(img, x, y) {
   let idx = imageIndex(img, x, y);
   let pix = img.pixels;
@@ -571,7 +1053,7 @@ function getColorAtIndex(img, x, y) {
   return color(red, green, blue, alpha);
 }
 
-//sets a color of a pixel at coordinates (x,y)
+// sets a color of a pixel at coordinates (x,y)
 function setColorAtIndex(img, x, y, clr) {
   let idx = imageIndex(img, x, y);
   let pix = img.pixels;
@@ -589,8 +1071,8 @@ function closestStep(max, steps, value) {
 
 
 
-//make image grayscale
-//adapted from https://github.com/kgjenkins/dither-dream
+// make image grayscale
+// adapted from https://github.com/kgjenkins/dither-dream
 function grayscale(img, contrast) {
   img.loadPixels();
   for (let y = 0; y < img.height; y++) {
@@ -611,16 +1093,85 @@ function grayscale(img, contrast) {
   img.updatePixels();
 }
 
-//stripes the image with black bands
-function makeStriped(img, stripe_step) {
+// change image contrast
+function setContrast(img, contrast) {
+  img.loadPixels();
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      let clr = getColorAtIndex(img, x, y);
+      let r = red(clr);
+      let g = green(clr);
+      let b = blue(clr);
+      let a = alpha(clr);
+      //stretch to increase contrast
+      r = r + (r-128)*contrast;
+      g = g + (g-128)*contrast;
+      b = b + (b-128)*contrast;
+      let newClr = color(r, g, b, a);
+      setColorAtIndex(img, x, y, newClr);
+    }
+  }
+  img.updatePixels();
+}
+
+// change image brightness
+function setBrightness(img, brightness) {
+  img.loadPixels();
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      let clr = getColorAtIndex(img, x, y);
+      let r = red(clr);
+      let g = green(clr);
+      let b = blue(clr);
+      let a = alpha(clr);
+      //multiply by the constant to change the brightness
+      r = r * brightness;
+      g = g * brightness;
+      b = b * brightness;
+      //constrain RGB to make sure they are within 0-255 color range
+      r = constrain(r, 0, 255);
+      g = constrain(g, 0, 255);
+      b = constrain(b, 0, 255);
+      let newClr = color(r, g, b, a);
+      setColorAtIndex(img, x, y, newClr);
+    }
+  }
+  img.updatePixels();
+}
+
+// stripes the image with black bands
+function makeStriped(img, stripe_width, stripe_offset = 0, invert = false) {
   img.loadPixels();
   for (let y = 0; y < img.height; y += 1) {
     for (let x = 0; x < img.width; x += 1) {
       let clr = getColorAtIndex(img, x, y);
-      let r = y % stripe_step == 0 ? red(clr) : 0 ;
-      let g = y % stripe_step == 0 ? green(clr) : 0 ;
-      let b = y % stripe_step == 0 ? blue(clr) : 0 ;
-      let newClr = color(r, g, b);
+      // here we use some smart boolean logic to quickly invert the black band pattern
+      let r = y % stripe_width == stripe_offset ? red(clr)*!invert : red(clr)*invert ;
+      let g = y % stripe_width == stripe_offset ? green(clr)*!invert : green(clr)*invert ;
+      let b = y % stripe_width == stripe_offset ? blue(clr)*!invert : blue(clr)*invert ;
+      let newClr = color(r, g, b, alpha(clr));
+      setColorAtIndex(img, x, y, newClr);
+    }
+  }
+  img.updatePixels();
+}
+
+// make parts of the image transparent based on brightness
+function brightnessMask(img, contrast, treshold, invert = false) {
+  img.loadPixels();
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      let clr = getColorAtIndex(img, x, y);
+      let r = red(clr);
+      let g = green(clr);
+      let b = blue(clr);
+      let a = alpha(clr);
+      // calculate greyscale following Rec 601 luma
+      let v = (0.3*r + 0.58*g + 0.11*b) * a/255;
+      // stretch to increase contrast
+      v = v + (v-128)*contrast;
+      let newAlpha = brightness(clr) > treshold ? 255*!invert : 255*invert;
+      let newClr = color(r, g, b, newAlpha);
       setColorAtIndex(img, x, y, newClr);
     }
   }
@@ -628,17 +1179,46 @@ function makeStriped(img, stripe_step) {
 }
 
 
+// flip image horizontally
+function flipHorizontal(img) {
+  let img_temp = createImage(img.width, img.height);
+  img_temp.loadPixels();
+  img.loadPixels();
+  // create a temporary image with flipped pixels
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      let clr = getColorAtIndex(img, img.width - x, y);
+      let r = red(clr);
+      let g = green(clr);
+      let b = blue(clr);
+      let a = alpha(clr);
+      let newClr = color(r, g, b, a);
+      setColorAtIndex(img_temp, x, y, newClr);
+    }
+  }
+  // replace all pixels from the original image with the pixels from the flipped one
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      let clr = getColorAtIndex(img_temp, x, y);
+      let r = red(clr);
+      let g = green(clr);
+      let b = blue(clr);
+      let a = alpha(clr);
+      let newClr = color(r, g, b, a);
+      setColorAtIndex(img, x, y, newClr);
+    }
+  }
+  img.updatePixels();
+  img_temp.updatePixels();
+}
+
+
 
 /**
  * Resize the image to a new width and height using nearest neighbor algorithm.
  * To make the image scale proportionally, use 0 as the value for the wide or high parameters.
- * For instance, to make the width of an image 150 pixels,
- * and change the height using the same proportion, use resize(150, 0).
- * Otherwise same usage as the regular resize().
- *
  * Note: Disproportionate resizing squashes the "pixels" from squares to rectangles.
  * This works about 10 times slower than the regular resize.
- * Any suggestions for performance increase are welcome.
  */
 
 // https://GitHub.com/processing/p5.js/issues/1845
@@ -647,56 +1227,29 @@ function makeStriped(img, stripe_step) {
 
 p5.Image.prototype.resizeNN = function (w, h) {
   "use strict";
-
-  // Locally cache current image's canvas' dimension properties:
-  const {width, height} = this.canvas;
-
-  // Sanitize dimension parameters:
-  w = ~~Math.abs(w), h = ~~Math.abs(h);
-
-  // Quit prematurely if both dimensions are equal or parameters are both 0:
-  if (w === width && h === height || !(w | h))  return this;
-
+  const {width, height} = this.canvas; // Locally cache current image's canvas' dimension properties
+  w = ~~Math.abs(w), h = ~~Math.abs(h); // Sanitize dimension parameters
+  if (w === width && h === height || !(w | h))  return this; // Quit prematurely if both dimensions are equal or parameters are both 0
   // Scale dimension parameters:
   w || (w = h*width  / height | 0); // when only parameter w is 0
   h || (h = w*height / width  | 0); // when only parameter h is 0
-
   const img = new p5.Image(w, h), // creates temporary image
         sx = w / width, sy = h / height; // scaled coords. for current image
-
   this.loadPixels(), img.loadPixels(); // initializes both 8-bit RGBa pixels[]
-
   // Create 32-bit viewers for current & temporary 8-bit RGBa pixels[]:
   const pixInt = new Int32Array(this.pixels.buffer),
         imgInt = new Int32Array(img.pixels.buffer);
-
-  // Transfer current to temporary pixels[] by 4 bytes (32-bit) at once:
+  // Transfer current to temporary pixels[] by 4 bytes (32-bit) at once
   for (let y = 0; y < h; ) {
     const curRow = width * ~~(y/sy), tgtRow = w * y++;
-
     for (let x = 0; x < w; ) {
       const curIdx = curRow + ~~(x/sx), tgtIdx = tgtRow + x++;
       imgInt[tgtIdx] = pixInt[curIdx];
     }
   }
-
   img.updatePixels(); // updates temporary 8-bit RGBa pixels[] w/ its current state
-
-  // Resize current image to temporary image's dimensions:
+  // Resize current image to temporary image's dimensions
   this.canvas.width = this.width = w, this.canvas.height = this.height = h;
   this.drawingContext.drawImage(img.canvas, 0, 0, w, h, 0, 0, w, h);
-
   return this;
-};
-
-
-
-// Stored Floyd-Steinberg parameters which can be called from JSON
-
-const FS_params = {
-
-  'standard' : [7/16.0, 3/16.0, 5/16.0, 1/16.0],
-  'a' : [-1/16.0, 10/16.0, -1/16.0, 10/16.0],
-  'b' : [-13/16.0, 13/16.0, -20/16.0, -11/16.0]
-
 };
