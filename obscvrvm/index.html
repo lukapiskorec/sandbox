@@ -1,0 +1,131 @@
+<head>
+  <style> body { margin: 0; } </style>
+  <script src="js/unpkg/three.js"></script>
+  <script src="js/unpkg/perlin.min.js"></script>
+  <script src="js/postprocessing/EffectComposer.js"></script>
+  <script src="js/postprocessing/RenderPass.js"></script>
+  <script src="js/postprocessing/MaskPass.js"></script>
+  <script src="js/postprocessing/ShaderPass.js"></script>
+  <!--script src="js/shaders/DepthLimitedBlurShader.js"></script-->
+  <script src="js/shaders/CopyShader.js"></script>
+  <script src="js/shaders/FXAAShader.js"></script>
+  <script src="js/shaders/PixelateShader.js"></script>
+  <script src="js/shaders/C64Shader.js"></script>
+  <!--script src="js/shaders/ConvolutionShader.js"></script-->
+  <!--script src="../../js/shaders/DigitalGlitch.js"></script-->
+  <script src="js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="js/postprocessing/BokehPass.js"></script>
+  <script src="js/shaders/BokehShader.js"></script>
+  <script src="js/shaders/SimpleFilmGrainShader.js"></script>
+  <!--script src="js/unpkg/THREE.MeshLine.js"></script-->
+  <!--<script src="../../js/unpkg/dat.gui.js"></script-->
+
+  <!--<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script-->
+
+  <!--script src="js/shaders/SAOShader.js"></script-->
+  <script src="js/shaders/CopyShader.js"></script>
+  <!--script src="js/shaders/UnpackDepthRGBAShader.js"></script-->
+
+  <script src="js/postprocessing/Pass.js"></script>
+  <script src="js/subdivision_module/subdivision.js"></script>
+  <script src="js/subdivision_module/lattice_generation.js"></script>
+
+
+  <!--script src="js/PathTracingCommon.js"> </script>
+  <script src="js/InitCommon.js"> </script>
+  <script src="js/HyprOrnament.js"> </script-->
+  <!--script src="../../js/capture/CCapture.all.min.js"></script-->
+  <script src="js/capture/CCapture.all.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script id="fxhash-snippet">
+    //---- do not edit the following code (you can indent as you wish)
+    let alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+    var fxhash = "oo" + Array(49).fill(0).map(_=>alphabet[(Math.random()*alphabet.length)|0]).join('')
+    let b58dec = str=>[...str].reduce((p,c)=>p*alphabet.length+alphabet.indexOf(c)|0, 0)
+    let fxhashTrunc = fxhash.slice(2)
+    let regex = new RegExp(".{" + ((fxhashTrunc.length/4)|0) + "}", 'g')
+    let hashes = fxhashTrunc.match(regex).map(h => b58dec(h))
+    let sfc32 = (a, b, c, d) => {
+      return () => {
+        a |= 0; b |= 0; c |= 0; d |= 0
+        var t = (a + b | 0) + d | 0
+        d = d + 1 | 0
+        a = b ^ b >>> 9
+        b = c + (c << 3) | 0
+        c = c << 21 | c >>> 11
+        c = c + t | 0
+        return (t >>> 0) / 4294967296
+      }
+    }
+    var fxrand = sfc32(...hashes)
+    // true if preview mode active, false otherwise
+    // you can append preview=1 to the URL to simulate preview activeblock
+    var isFxpreview = new URLSearchParams(window.location.search).get('preview') === "1"
+    // call this method to trigger the preview
+    function fxpreview() {
+      console.log("fxhash: TRIGGER PREVIEW")
+    }
+    //---- /do not edit the following code
+  </script>
+
+</head>
+
+<body>
+
+  <!-- LOADING SCREEN -->
+  <div id="loading">
+      <div id="loading_background"></div>
+      <img src="loading/protocell_labs_lattice_200pix_20fps_4col_v5.gif" class="spinner" style="display: block;">
+      <div id="loading_overlay"></div>
+      <span id="loading_text" style="font-weight: bold;">
+        O B S C V R V M
+      </span>
+      <span id="loading_text" style="font-size: 15px; transform: translate(-50%, 160px);">
+        { p r o t o c e l l : l a b s }<br><br>
+        2 0 2 2
+      </span>
+  </div>
+
+  <!-- KEYBINDING SCREEN -->
+  <div id="keybinding" style="display: none;">
+      <div id="keybinding_modal"></div>
+      <span id="keybinding_text" style="font-weight: bold;">
+        <ul style="list-style-type: none;">
+          <li><b>a</b> : s k i p&nbsp;&nbsp;t i m e</li>
+          <li><b>f</b>  : c y c l e&nbsp;&nbsp;f r a m e r a t e</li>
+          <li><b>t</b>  : c y c l e&nbsp;&nbsp;t i c k</li>
+          <li><b>g</b>  : s t a r t / s t o p&nbsp;&nbsp;g i f&nbsp;&nbsp;c a p t u r e</li>
+          <li><b>1</b>  : i m a g e  (x 1)  c a p t u r e</li>
+          <li><b>2</b>  : i m a g e  (x 2)  c a p t u r e</li>
+          <li><b>3</b>  : i m a g e  (x 3)  c a p t u r e</li>
+          <li><b>4</b>  : i m a g e  (x 4)  c a p t u r e</li>
+          <li><b>5</b>  : i m a g e  (x 5)  c a p t u r e</li>
+        </ul>
+      </span>
+  </div>
+
+  <div id="hyprornament"></div>
+
+  <div class="container-fluid">
+      <div class="row">
+          <div class="col-lg-2 col-md-2 col-sm-2 col-xs-2" id="leftMenu">
+          </div>
+          <div class="col-lg-8 col-md-8 col-sm-8 col-xs-8">
+              <div class="row" id="viewport">
+              </div>
+              <div class="row" id="informationMenu">
+              </div>
+          </div>
+          <div class="col-lg-2 col-md-2 col-sm-2 col-xs-2" id="rightMenu">
+          </div>
+      </div>
+  </div>
+  
+
+  <!-- MAIN CODE GOES HERE -->
+  <script src="js/utils_and_params/utils.js"></script>
+  <script src="js/utils_and_params/params.js"></script>
+  <script defer="defer" src="main.js"></script>
+
+</body>
