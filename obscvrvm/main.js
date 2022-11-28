@@ -269,8 +269,8 @@ function View(viewArea) {
   light.shadow.camera.near = 200;
   light.shadow.camera.far = 2000;
   light.shadow.bias = - 0.000222;
-  light.shadow.mapSize.width = 1024; //increase for better quality of shadow, standard is 2048, used 4096, 512 works on mobile
-  light.shadow.mapSize.height = 1024; //increase for better quality of shadow, standard is 2048, used 4096, 512 works on mobile
+  light.shadow.mapSize.width = 2048; //increase for better quality of shadow, standard is 2048, used 4096, 512 works on mobile, 1024 works on mobile
+  light.shadow.mapSize.height = 2048; //increase for better quality of shadow, standard is 2048, used 4096, 512 works on mobile, 1024 works on mobile
 
   scene.add(light);
 
