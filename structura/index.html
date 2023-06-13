@@ -1,0 +1,99 @@
+<head>
+  <style> body { margin: 0; } </style>
+  <script src="js/unpkg/three.js"></script>
+  <script src="js/unpkg/perlin.min.js"></script>
+  <script src="js/postprocessing/EffectComposer.js"></script>
+  <script src="js/postprocessing/RenderPass.js"></script>
+  <script src="js/postprocessing/MaskPass.js"></script>
+  <script src="js/postprocessing/ShaderPass.js"></script>
+  <script src="js/shaders/CopyShader.js"></script>
+  <script src="js/shaders/PixelEdgeShader.js"></script>
+  <script src="js/subdivision_module/subdivision.js"></script>
+  <script src="js/capture/CCapture.all.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="manifest" href="site.webmanifest">
+  <title>Structura by office ca & {protocell:labs}</title>
+  <script>
+      var q = new URLSearchParams(window.location.search).get("payload");
+      var parsed = JSON.parse(q ? atob(q) : "{}");
+      var hash = parsed.hash || (Math.random() + 1).toString(16).substring(2);
+      
+      function capturePreview() {
+        dispatchEvent(new Event("capture-preview"));
+      }
+      // prettier-ignore
+      const Random=function(n){var r,$,t,u,_=function n(r){for(var $=0,t=1779033703^r.length;$<r.length;$++)t=(t=Math.imul(t^r.charCodeAt($),3432918353))<<13|t>>>19;return function(){return t=Math.imul((t=Math.imul(t^t>>>16,2246822507))^t>>>13,3266489909),(t^=t>>>16)>>>0}}(n),o={rand:(r=_(),$=_(),t=_(),u=_(),function(){t|=0;var n=((r|=0)+($|=0)|0)+(u|=0)|0;return u=u+1|0,r=$^$>>>9,$=t+(t<<3)|0,t=(t=t<<21|t>>>11)+n|0,(n>>>0)/4294967296}),randInt:function(n,r){return n+Math.floor((r-n)*o.rand())}};return o};
+      const prng = Random(hash);
+  </script>
+
+</head>
+
+<body>
+
+  <!-- LOADING SCREEN -->
+  <div id="loading">
+      <div id="loading_background"></div>
+      <img src="loader/Structura_Marble_frame_12x2_5fps_v02.gif" class="spinner" style="display: block;">
+      <div id="loading_overlay"></div>
+      <span id="loading_text" style="font-weight: bold;">
+        S t r u c t u r a
+      </span>
+      <span id="loading_text" style="font-size: 10px; transform: translate(-50%, 110px);">
+        o f f i c e&nbsp;&nbsp;c a&nbsp;&nbsp;+&nbsp;&nbsp;{ p r o t o c e l l : l a b s }<br><br>
+        2 0 2 3
+      </span>
+  </div>
+
+  <!-- KEYBINDING SCREEN -->
+  <div id="keybinding" style="display: none;">
+      <div id="keybinding_modal"></div>
+      <span id="keybinding_text" style="font-weight: bold;">
+        <ul style="list-style-type: none;">
+          <li>C O N T R O L S</li><br>
+          <li>L I G H T</li><br>
+          <li><b>l</b> : j u m p&nbsp;&nbsp;l i g h t&nbsp;&nbsp;a n g l e</li>
+          <li><b>f</b> : c y c l e&nbsp;&nbsp;l i g h t&nbsp;&nbsp;f r a m e r a t e</li>
+          <li><b>t</b> : c y c l e&nbsp;&nbsp;l i g h t&nbsp;&nbsp;t i c k</li><br>
+          <li>C A P T U R E</li><br>
+          <li><b>g</b> : g i f&nbsp;&nbsp;c a p t u r e&nbsp;&nbsp;1 0&nbsp;&nbsp;f p s</li>
+          <li><b>1 - 5</b> : i m a g e&nbsp;&nbsp;c a p t u r e&nbsp;&nbsp;1 - 5 x</li><br>
+          <li>M I S C</li><br>
+          <li><b>i</b> : i n f o</li>
+          <li><b>b</b> : w h i t e / b l a c k&nbsp;&nbsp;b a c k g r o u n d</li>
+          <li><b>n</b> : c y c l e&nbsp;&nbsp;g i f&nbsp;&nbsp;f r a m e s&nbsp;&nbsp;a n d&nbsp;&nbsp;r o t&nbsp;&nbsp;a n g l e</li>
+          <li><b>a</b> : j u m p&nbsp;&nbsp;c a m e r a&nbsp;&nbsp;a n g l e</li><br><br>
+          <li>S t r u c t u r a</li>
+          <li>o f f i c e&nbsp;&nbsp;c a&nbsp;&nbsp;+&nbsp;&nbsp;{ p r o t o c e l l : l a b s }</li>
+          <li>2 0 2 3</li>
+        </ul>
+      </span>
+  </div>
+
+  <div class="container-fluid">
+      <div class="row">
+          <div class="col-lg-2 col-md-2 col-sm-2 col-xs-2" id="leftMenu">
+          </div>
+          <div class="col-lg-8 col-md-8 col-sm-8 col-xs-8">
+              <div class="row" id="viewport">
+              </div>
+              <div class="row" id="informationMenu">
+              </div>
+          </div>
+          <div class="col-lg-2 col-md-2 col-sm-2 col-xs-2" id="rightMenu">
+          </div>
+      </div>
+  </div>
+  
+
+  <!-- MAIN CODE GOES HERE -->
+  <script src="js/utils_and_params/utils.js"></script>
+  <script src="js/utils_and_params/params.js"></script>
+  <script src="js/utils_and_params/palettes.js"></script>
+  <script defer="defer" src="main.js"></script>
+
+</body>
