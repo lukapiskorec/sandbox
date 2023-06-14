@@ -51,14 +51,11 @@ body {
 #loading_text{
   z-index: 9999;
   font-family: "Courier New", monospace;
-  /*font-style: italic;*/
   color: white;
-  font-size: 15px;
   font-weight: normal;
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, 80px);
   text-align: center;
 }
 
@@ -76,9 +73,8 @@ body {
 #keybinding_text{
   z-index: 550;
   font-family: "Courier New", monospace;
-  /*font-style: normal;*/
   color: white;
-  font-size: 15px;
+  font-size: 1.5vw;
   font-weight: normal;
   position: absolute;
   top: 50%;

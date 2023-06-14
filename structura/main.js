@@ -474,20 +474,53 @@ console.log( structura_logo,
             'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;',
             'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;');
 
-console.log("%cFRAME", "color: white; background: #000000;");
-console.log("Composition ->", composition_type);
-console.log("Size ->", total_frame_size_x, "x", total_frame_size_y);
-console.log("Details ->", detail_type);
-console.log("Cladding ->", cladding_type);
-console.log("Deconstruction ->", deconstruction_type);
+var frame_description = "%cFRAME\n\n"
+                        + "%cComposition -> " + composition_type
+                        + "\nSize -> " + total_frame_size_x + " x " + total_frame_size_y
+                        + "\nDetails -> " + detail_type
+                        + "\nCladding -> " + cladding_type
+                        + "\nDeconstruction -> " + deconstruction_type + "\n";
 
-console.log("%cCOLOR", "color: white; background: #000000;");
-console.log("Pigments ->", pigments); // pigments are groups of color palletes
-console.log("Palette ->", palette_name); // palette is where the colors are stored (ordered is shuffled)
-console.log("Background ->\t%c    ", `color: white; background: #${color_background.getHexString()};`);
-console.log("Amorphe ->   \t%c    ", `color: white; background: #${color_amorphe.getHexString()};`);
-console.log("Frame ->     \t%c    ", `color: white; background: #${color_frame.getHexString()};`);
-console.log("Cladding ->  \t%c    ", `color: white; background: #${color_cladding.getHexString()};`);
+console.log( frame_description,
+            "color: white; background: #000000;",
+            "color: black; background: #ffffff;");
+
+var color_description = "%cCOLOR\n\n" 
+                        + "%cPigments -> " + pigments // pigments are groups of color palletes
+                        + "\nPalette -> " + palette_name // palette is where the colors are stored (ordered is shuffled)
+                        + "\n\nBackground ->\t%c    "
+                        + "%c\nAmorphe ->   \t%c    "
+                        + "%c\nFrame ->     \t%c    "
+                        + "%c\nCladding ->  \t%c    "  + "\n";
+
+console.log( color_description,
+            "color: white; background: #000000;",
+            "color: black; background: #ffffff;",
+            `color: white; background: #${color_background.getHexString()};`,
+            "color: black; background: #ffffff;",
+            `color: white; background: #${color_amorphe.getHexString()};`,
+            "color: black; background: #ffffff;",
+            `color: white; background: #${color_frame.getHexString()};`,
+            "color: black; background: #ffffff;",
+            `color: white; background: #${color_cladding.getHexString()};`);
+
+var controls_description = "%cCONTROLS\n\n"
+                           + "%cLIGHT\n"
+                           + "l : rotate light\n"
+                           + "f : cycle light framerate\n"
+                           + "t : cycle light tick\n\n"
+                           + "CAPTURE\n"
+                           + "g : gif capture 10 fps\n"
+                           + "1-5 : image capture 1-5x\n\n"
+                           + "MISC\n"
+                           + "i : info\n"
+                           + "b : white/black background\n"
+                           + "n : cycle gif frames and rot angle\n"
+                           + "<- -> : rotate camera"  + "\n";
+
+console.log( controls_description,
+            "color: white; background: #000000;",
+            "color: black; background: #ffffff;")
 
 
 // TOKEN FEATURES
@@ -1312,7 +1345,14 @@ function doc_keyUp(e) {
   } else if (e.keyCode === 76 ) {  //"l" = jump light angle by 30 degrees
     light_angle += Math.PI/6; //advance light angle by 30 deg
     console.log("light rotated 30 degrees");
-  } else if (e.keyCode === 65 ) { //"a" = jump angle by one step 
+  } else if (e.keyCode === 37 ) { //arrow left - rotate camera
+    this_scene.rotateY(-2*Math.PI/gif_frames);  
+    var rotScaleTranslation = new THREE.Matrix4();
+    rotScaleTranslation.compose( this_scene.position, this_scene.quaternion, this_scene.scale );
+    this_scene.updateMatrix();
+    this_scene.matrix.makeShear(0, 0, 0, 0, 0, zy_shear_f).multiply( rotScaleTranslation )
+    this_scene.updateMatrixWorld(true);
+  } else if (e.keyCode === 39 ) { //arrow right - rotate camera, before e.keyCode === 65, "a" = jump angle by one step 
     this_scene.rotateY(2*Math.PI/gif_frames);  
     var rotScaleTranslation = new THREE.Matrix4();
     rotScaleTranslation.compose( this_scene.position, this_scene.quaternion, this_scene.scale );
