@@ -74,7 +74,7 @@ body {
   z-index: 550;
   font-family: "Courier New", monospace;
   color: white;
-  font-size: 1.5vw;
+  font-size: 1.5vmin;
   font-weight: normal;
   position: absolute;
   top: 50%;
