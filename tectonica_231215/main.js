@@ -1387,6 +1387,14 @@ function Controller(viewArea) {
 
     window.addEventListener("mousedown", mouseDown);
     window.addEventListener("mouseup", mouseUp);
+
+    // this weird part is to fix Safari not responding to touch events
+    // from: https://stackoverflow.com/questions/24077725/mobile-safari-sometimes-does-not-trigger-the-click-event
+    window.addEventListener("touchstart", () => {});
+    window.addEventListener("touchend", () => {});
+    window.addEventListener("touchcancel", () => {});
+    window.addEventListener("touchmove", () => {}); 
+
 }
 
 function tectonica () {
