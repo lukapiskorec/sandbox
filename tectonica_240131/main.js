@@ -124,8 +124,8 @@ renderer.toneMappingExposure = 10; // default is 1
 
 const composer = new THREE.EffectComposer(renderer);
 let snap = false;
-let quality = 1;
-let standard_quality = 1;
+let quality = 0;
+let standard_quality = 2.0;
 var capturer = null;
 let recording = false;
 
@@ -149,10 +149,13 @@ function View(viewArea) {
   viewport.style.marginTop=margin_top+'px';
   viewport.style.marginLeft=margin_left+'px';
 
+  
 
+
+  
   ///SCALING
-  cam_factor_mod = cam_factor * Math.min(viewportWidth*standard_quality/1000, viewportHeight*standard_quality/1000);
-  console.log("original"+cam_factor_mod.toString());
+  cam_factor_mod = cam_factor * Math.min(viewportWidth/1000, viewportHeight/1000);
+
   renderer.setSize( viewportWidth*standard_quality, viewportHeight*standard_quality );
   renderer.shadowMap.enabled = true;
   renderer.domElement.id = 'tectonicacanvas';
@@ -168,7 +171,8 @@ function View(viewArea) {
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
   composer.setSize(viewportWidth*standard_quality, viewportHeight*standard_quality)
-  console.log("Original width:"+viewportWidth.toString()+" & height:"+viewportHeight.toString())
+
+
 
   // change scene background to solid color
   scene.background = new THREE.Color('#010102'); // slightly bluish dark sky, #080808, #020202
@@ -264,6 +268,8 @@ function View(viewArea) {
   this.curves = [];
 
 
+
+
   // original order - renderPass, effectFXAA, bloomPass
   // changed the order after we introduced OutputPass
 
@@ -284,10 +290,13 @@ function View(viewArea) {
 
   // FXAA antialiasing
   effectFXAA = new THREE.ShaderPass(THREE.FXAAShader);
-  effectFXAA.uniforms['resolution'].value.x = 1 / (4*viewportWidth * window.devicePixelRatio);
-  effectFXAA.uniforms['resolution'].value.y = 1 / (4*viewportHeight * window.devicePixelRatio);
+  effectFXAA.uniforms['resolution'].value.x = 1 / (viewportWidth * standard_quality * window.devicePixelRatio);
+  effectFXAA.uniforms['resolution'].value.y = 1 / (viewportHeight * standard_quality * window.devicePixelRatio);
   this.composer.addPass(effectFXAA);
 
+  //fit it.
+  //viewportAdjust(document.getElementById('viewport'), false)
+  //fitCameraToViewport(this, viewportWidth*standard_quality, viewportHeight*standard_quality, true); //Projection Matrix Updated here
 
 }
 
@@ -1278,7 +1287,7 @@ function Controller(viewArea) {
   var view = new View(viewArea);
   view.cam_distance = 700 //1000 for ortho
   this.view = view; //referenced outside
-
+  
   view.addDenseMatter(); // dense grid of colored elements
   view.addStarsRandom(1000, 15000); // random stars - parameters > (bounds, quantity)
   
@@ -1287,7 +1296,7 @@ function Controller(viewArea) {
     view.addStarDust(); // star dust (made with random walk algorithm)
     view.addMoon(); // adds a large glowing moon with few shiny stars around
   }
-
+  onWindowResize();
   view.preRender();
  
 
@@ -1315,6 +1324,7 @@ function Controller(viewArea) {
   function onWindowResize() {
     //console.log("resize")
     viewportAdjust(document.getElementById('viewport'), false);
+    //viewportAdjust(document.getElementById('viewport'), false);
     fitCameraToViewport(view, viewportWidth, viewportHeight);
     }
 
@@ -1324,8 +1334,20 @@ function Controller(viewArea) {
    const pointer = new THREE.Vector2();
 
     function resetClickCenter(event) {
-        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-        pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        x = 0;
+        y = 0;
+        if(event.type == 'touchstart' || event.type == 'touchmove' || event.type == 'touchend' || event.type == 'touchcancel'){
+            console.log(event)
+            var touch = event.touches[0] || event.changedTouches[0];
+            x = touch.pageX;
+            y = touch.pageY;
+        } else if (event.type == 'mousedown' || event.type == 'mouseup' || event.type == 'mousemove' || event.type == 'mouseover'|| event.type=='mouseout' || event.type=='mouseenter' || event.type=='mouseleave') {
+            x = event.clientX;
+            y = event.clientY;
+        }
+        pointer.x = (x / window.innerWidth) * 2 - 1;
+        pointer.y = - (y / window.innerHeight) * 2 + 1;
+        console.log(x, y);
         raycaster.setFromCamera(pointer, view.camera);
         const intersects = raycaster.intersectObjects(view.scene.children, true);
 
@@ -1376,34 +1398,65 @@ function Controller(viewArea) {
     }
     }
   
-
+  function isTouchDevice() {
+      return 'ontouchstart' in window        // works on most browsers
+          || navigator.maxTouchPoints;       // works on IE10/11 and Surface
+  }
   var mouseTimer;
+  var touchTimer;
   function mouseDown(event) { 
+    if (!isTouchDevice()) {
       //mouseUp();
-      event.preventDefault();
+      //event.preventDefault();
       mouseTimer = window.setTimeout(function () {
         console.log("HoldClick")
         onPointerDoubleClick(event, true);
         
         },800); //set timeout to fire in 2 seconds when the user presses mouse button down
+    }
   }
 
   function mouseUp(event) { 
+    if (!isTouchDevice()) {
       if (mouseTimer) {
         window.clearTimeout(mouseTimer);  //cancel timer when mouse button is released
         console.log("SingleClick")
         onPointerClick(event);
       } 
+    }
+  }
+
+  function touchDown(event) { 
+    if (isTouchDevice()) {
+    //event.preventDefault();
+      touchTimer = window.setTimeout(function () {
+      console.log("TouchHold")
+      onPointerDoubleClick(event, true);
+      
+      },800); //set timeout to fire in 2 seconds when the user presses mouse button down
+    }
+  }
+  //function touchDownTest(event) {console.log("TDown")}
+  //function touchUpTest(event){console.log("TUp")}
+  function touchUp(event) { 
+    if (isTouchDevice()) {
+      if (touchTimer) {
+        window.clearTimeout(touchTimer);  //cancel timer when mouse button is released
+        console.log("Tap")
+        onPointerClick(event);
+      }  
+    }
   }
 
     window.addEventListener("mousedown", mouseDown);
     window.addEventListener("mouseup", mouseUp);
+    window.addEventListener("touchstart", touchDown)
+    window.addEventListener("touchend",touchUp);
 }
 
 function tectonica () {
   controller = new Controller('viewport');
 }
-
 
 function viewportAdjust(vp, inner=true) {
   ///ADJUST SIZE AND MARGIN
@@ -1422,8 +1475,6 @@ function viewportAdjust(vp, inner=true) {
 
       margin_top = (window.innerHeight - viewportHeight)/2;
       margin_left = 0;
-
-
     }
 
     ///SCALING
@@ -1450,6 +1501,7 @@ function viewportAdjust(vp, inner=true) {
 
     ///SCALING
     cam_factor_mod = cam_factor * Math.min(viewportWidth/1000, viewportHeight/1000);
+
   }
   vp.style.marginTop=margin_top+'px';
   vp.style.marginLeft=margin_left+'px';
@@ -1459,8 +1511,9 @@ function viewportAdjust(vp, inner=true) {
 function fitCameraToViewport(view_instance, w,h, adjust=true) {
   view_instance.renderer.setSize( w, h);
   view_instance.composer.setSize( w, h);
+  effectFXAA.uniforms['resolution'].value.x = 1 / (w);
+  effectFXAA.uniforms['resolution'].value.y = 1 / (h);
   //view_instance.camera.aspect = w / h;
-  console.log("width:"+w.toString()+" & height:"+h.toString())
   if (adjust) {
     view_instance.camera.left = -w / cam_factor_mod;
     view_instance.camera.right = w / cam_factor_mod;
@@ -1607,13 +1660,14 @@ const capture = (contx) => {
   }
   // Set to standard quality
   quality = standard_quality;
-
-  viewportAdjust(document.getElementById('viewport'))
+  //viewportAdjust(document.getElementById('viewport'), false)
   cam_factor_mod = cam_factor * Math.min(viewportWidth*quality/1000, viewportHeight*quality/1000);
-
-  fitCameraToViewport(contx.view, viewportWidth, viewportHeight); //Projection Matrix Updated
-
+  //fitCameraToViewport(contx.view, viewportWidth, viewportHeight); //Projection Matrix Updated
+  
   composer.render();
+
+  viewportAdjust(document.getElementById('viewport'), false);
+  fitCameraToViewport(contx.view, viewportWidth, viewportHeight);
 };
 
 
